@@ -1,0 +1,68 @@
+# Metadatos del complemento. El repositorio oficial de QGIS valida estos campos
+# y rechaza los que traigan enlaces de relleno o que no respondan.
+
+[general]
+name=ToolkitPalm
+qgisMinimumVersion=3.16
+description=Detect, count and number oil palm trees, and trim the empty borders of drone orthomosaics.
+version=1.1.0
+author=Ing. Adán Arias
+email=ingarias9006@gmail.com
+
+about=ToolkitPalm brings together geoprocessing tools for oil palm plantations in a single panel, designed to work on drone orthomosaics:
+    - Palm Detector: counts and locates every palm tree, with manual editing of the detected points, automatic numbering along planting rows, missing-palm detection and highlighting of off-pattern palms.
+    - Trim orthomosaic borders: removes the flat grey, white or black frame around the photographed area.
+    .
+    All processing runs on a remote server, so no GPU or deep learning libraries are needed on your machine. Large plots are automatically split into blocks, and an interrupted job can be resumed where it stopped.
+    .
+    Usage requires signing in with a Google account. Detection spends processing credits: one credit covers up to 5 hectares, charged per plot rather than per block. Every new account gets one free trial credit. Credit packages can be purchased from within the plugin.
+    .
+    The plugin contains no secrets or embedded API keys: authorisation is granted by the user's own Google session, which the server verifies directly with Google.
+    .
+    Dependencies: requests (shipped with the standard QGIS installation). No additional packages required.
+    .
+    Spanish: ToolkitPalm reúne herramientas para plantaciones de palma de aceite sobre ortomosaicos de dron: detección, conteo y numeración de palmas, y recorte de los bordes vacíos de la ortofoto. Todo el procesamiento corre en el servidor.
+
+tracker=https://github.com/gaminuma06/toolkitpalm-plugin/issues
+repository=https://github.com/gaminuma06/toolkitpalm-plugin
+homepage=https://github.com/gaminuma06/toolkitpalm-plugin
+
+# Recommended items:
+hasProcessingProvider=no
+
+changelog=1.1.0 - New processing server (api.adanarias.com): detection, numbering and border trimming work again for everyone.
+    - All processing now runs on the server; the plugin only contains the interface.
+    - New tool: Trim orthomosaic borders.
+    - Numbering by planting row, missing palms and manual editing.
+    1.0.3 - Fix: the Claude assistant connection (MCP) now works for everyone.
+    - The bridge that connects Claude with QGIS was not included in the published
+      package, so the setup instructions pointed to a file that did not exist.
+      It now ships inside the plugin.
+    - The Claude Desktop extension was rebuilt: it asks for the QGIS access key
+      during installation and sends it with every request, as QGIS requires
+      since 1.0.1.
+    .
+    1.0.2 - Fix: the plugin reacted to the system clipboard.
+    - The orthoimage fields listened to the whole system clipboard, so copying an
+      image in any other program - with QGIS open, even minimised - popped up an
+      "invalid orthoimage" warning. That no longer happens. Dragging a file onto
+      the field and pasting with Ctrl+V inside it work exactly as before.
+    .
+    1.0.1 - Fixes from the QGIS repository security scan.
+    - Errors that used to be discarded silently are now logged, so they can be
+      diagnosed.
+    - The digest that names the resume files moves from MD5 to SHA-256.
+    - The assistant (MCP) connection now requires a per-installation access key
+      and listens only on the local machine.
+    .
+    1.0.0 - First public release.
+
+tags=raster, deep learning, remote sensing, precision agriculture, oil palm, drone, uav, vegetation index, python
+
+category=Raster
+icon=icon.png
+experimental=False
+deprecated=False
+
+# El complemento se distribuye bajo GPL v2 o posterior (ver LICENSE).
+license=GPL-2.0-or-later
