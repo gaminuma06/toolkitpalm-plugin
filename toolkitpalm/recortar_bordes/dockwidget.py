@@ -14,8 +14,7 @@ from qgis.PyQt.QtWidgets import (QDockWidget, QVBoxLayout, QFormLayout, QLabel,
                                  QComboBox, QSpinBox, QPushButton, QCheckBox,
                                  QProgressBar, QMessageBox, QHBoxLayout, QLineEdit,
                                  QFileDialog)
-from qgis.core import (QgsProject, QgsMapLayer, QgsRasterLayer, QgsTask,
-                       QgsApplication)
+from qgis.core import (QgsProject, QgsRasterLayer, QgsTask, QgsApplication)
 
 from ..common.colors import AZUL_MEDIO, AZUL_CLARO
 
@@ -132,7 +131,7 @@ class RecortarBordesDockWidget(QDockWidget):
 
     def _capas_raster(self):
         return [l for l in QgsProject.instance().mapLayers().values()
-                if l.type() == QgsMapLayer.RasterLayer and l.providerType() == "gdal"]
+                if isinstance(l, QgsRasterLayer) and l.providerType() == "gdal"]
 
     def _refrescar_capas(self, *_):
         actual = self.combo_capa.currentData()
@@ -178,7 +177,7 @@ class RecortarBordesDockWidget(QDockWidget):
         if os.path.exists(salida):
             r = QMessageBox.question(self, "Recortar bordes",
                                      f"Ya existe:\n{salida}\n\n¿Reemplazarlo?")
-            if r != QMessageBox.Yes:
+            if r != QMessageBox.StandardButton.Yes:
                 return
             for l in QgsProject.instance().mapLayers().values():
                 if os.path.normcase(l.source().split("|")[0]) == os.path.normcase(salida):

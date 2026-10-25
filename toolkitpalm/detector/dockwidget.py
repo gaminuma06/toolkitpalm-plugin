@@ -22,24 +22,22 @@
  ***************************************************************************/
 """
 
+from ..common.compat import GEOM_PUNTO, GEOM_POLIGONO
 import os
-import time
 import logging
-import sys
-from datetime import datetime
 from qgis.PyQt import QtWidgets, uic
-from qgis.PyQt.QtCore import pyqtSignal, Qt, QThread, QTimer, QSettings
-from qgis.core import (QgsVectorLayer, QgsApplication, QgsProject, QgsRasterLayer,
-                      QgsGeometry, QgsCoordinateTransform, QgsMapLayer, QgsCoordinateReferenceSystem, QgsWkbTypes, Qgis)
+from qgis.PyQt.QtCore import pyqtSignal, Qt, QTimer, QSettings
+from qgis.core import (QgsVectorLayer, QgsProject, QgsRasterLayer, QgsGeometry,
+                      QgsCoordinateTransform, QgsCoordinateReferenceSystem, Qgis)
 from qgis.PyQt.QtWidgets import (QDialog, QVBoxLayout, QPushButton, QLabel,
-                                QMessageBox, QTextBrowser, QHBoxLayout, QLineEdit, QScrollArea, QCheckBox, QRadioButton, QProgressDialog)
-from qgis.PyQt.QtGui import QIcon, QPixmap, QPainter, QImage, QColor
+                                QMessageBox, QHBoxLayout, QLineEdit, QScrollArea, QProgressDialog)
+from qgis.PyQt.QtGui import QPixmap
 from qgis.PyQt.QtWidgets import QApplication
 from qgis.PyQt.QtGui import QKeySequence
 
 # Importar configuración
-from ..config import (API_BASE_URL, SUPPORTED_IMAGE_FORMATS, SUPPORTED_SHAPEFILE_FORMATS, REQUIRED_SHAPEFILE_EXTENSIONS,
-                    AUTH_ENDPOINT, AUTH_TIMEOUT, AUTH_API_KEY, AUTH_ENABLED, SKIP_AUTH_FOR_NOW)
+from ..config import (API_BASE_URL, AUTH_ENDPOINT, AUTH_TIMEOUT, AUTH_API_KEY,
+                    AUTH_ENABLED, SKIP_AUTH_FOR_NOW)
 from .palm_edit_toolbar import PalmEditToolbar
 
 # Sistema de logging simple y directo a archivo (sin usar logging de Python)
@@ -60,7 +58,7 @@ def write_log(message):
         try:
             with open('plugin_error.log', 'a', encoding='utf-8') as f:
                 f.write(f"Error en write_log: {str(e)}\n")
-        except:
+        except Exception:
             logging.getLogger(__name__).debug(
                 "Fallo no crítico; se continúa.", exc_info=True)
 
@@ -110,7 +108,7 @@ class ProgressDialog(QtWidgets.QDialog):
         
         # Label para mensaje informativo (tamaño de imagen, etc.)
         self.info_label = QtWidgets.QLabel("")
-        self.info_label.setAlignment(Qt.AlignCenter)
+        self.info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.info_label.setWordWrap(True)
         self.info_label.setStyleSheet("font-size: 12px; color: #1e3a8a; font-weight: bold; margin-bottom: 8px;")
         layout.addWidget(self.info_label)
@@ -137,7 +135,7 @@ class ProgressDialog(QtWidgets.QDialog):
         # Etiqueta para el mensaje actual
         self.message_label = QtWidgets.QLabel("Por favor espere...")
         self.message_label.setWordWrap(True)
-        self.message_label.setAlignment(Qt.AlignCenter)
+        self.message_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.message_label.setStyleSheet("font-size: 12px; margin-top: 10px;")
         layout.addWidget(self.message_label)
         
@@ -226,7 +224,7 @@ class ConfirmDialog(QtWidgets.QDialog):
         
         self.main_message = QtWidgets.QLabel("\n".join(message_parts))
         
-        self.main_message.setAlignment(Qt.AlignCenter)
+        self.main_message.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.main_message.setStyleSheet("""
             QLabel {
                 font-size: 12px;     
@@ -416,7 +414,7 @@ class LegalNoticeDialog(QDialog):
         """Muestra la primera pantalla con información del plugin"""
         # Cargar logo con dimensiones originales
         logo_label = self.create_logo()
-        self.layout.addWidget(logo_label, alignment=Qt.AlignCenter)
+        self.layout.addWidget(logo_label, alignment=Qt.AlignmentFlag.AlignCenter)
         
         # Título
         title_label = QLabel("DetectorPalmas")
@@ -429,7 +427,7 @@ class LegalNoticeDialog(QDialog):
                 background-color: transparent;
             }
         """)
-        title_label.setAlignment(Qt.AlignCenter)
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.layout.addWidget(title_label)
         
         # Crear área de scroll para el contenido
@@ -458,8 +456,8 @@ class LegalNoticeDialog(QDialog):
         # Widget contenedor para el scroll
         scroll_widget = QLabel()
         scroll_widget.setWordWrap(True)
-        scroll_widget.setTextFormat(Qt.RichText)
-        scroll_widget.setAlignment(Qt.AlignTop)
+        scroll_widget.setTextFormat(Qt.TextFormat.RichText)
+        scroll_widget.setAlignment(Qt.AlignmentFlag.AlignTop)
         
         # Contenido de la primera pantalla
         content = """
@@ -559,7 +557,7 @@ class LegalNoticeDialog(QDialog):
         
         button_layout.addWidget(self.continue_button)
         button_layout.addWidget(self.cancel_button)
-        button_layout.setAlignment(Qt.AlignCenter)
+        button_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
         self.layout.addLayout(button_layout)
     
@@ -576,7 +574,7 @@ class LegalNoticeDialog(QDialog):
         
         # Cargar logo con dimensiones originales
         logo_label = self.create_logo()
-        self.layout.addWidget(logo_label, alignment=Qt.AlignCenter)
+        self.layout.addWidget(logo_label, alignment=Qt.AlignmentFlag.AlignCenter)
         
         # Título
         title_label = QLabel("DetectorPalmas")
@@ -589,7 +587,7 @@ class LegalNoticeDialog(QDialog):
                 background-color: transparent;
             }
         """)
-        title_label.setAlignment(Qt.AlignCenter)
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.layout.addWidget(title_label)
         
         # Crear área de scroll para el contenido
@@ -618,8 +616,8 @@ class LegalNoticeDialog(QDialog):
         # Widget contenedor para el scroll
         scroll_widget = QLabel()
         scroll_widget.setWordWrap(True)
-        scroll_widget.setTextFormat(Qt.RichText)
-        scroll_widget.setAlignment(Qt.AlignTop)
+        scroll_widget.setTextFormat(Qt.TextFormat.RichText)
+        scroll_widget.setAlignment(Qt.AlignmentFlag.AlignTop)
         
         # Contenido del disclaimer completo
         content = """
@@ -684,12 +682,12 @@ class LegalNoticeDialog(QDialog):
             }
         """)
         self.accept_button.clicked.connect(self.accept)
-        self.layout.addWidget(self.accept_button, alignment=Qt.AlignCenter)
+        self.layout.addWidget(self.accept_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
     def create_logo(self):
         """Título del plugin para el Aviso Legal y el Disclaimer."""
         logo_label = QLabel("ToolkitPalm")
-        logo_label.setAlignment(Qt.AlignCenter)
+        logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         logo_label.setStyleSheet(
             "QLabel { color: #002856; font-size: 22px; font-weight: bold; "
             "background-color: transparent; border: none; margin: 8px; padding: 0px; }"
@@ -821,11 +819,11 @@ class DropLineEdit(QLineEdit):
                 # Verificar el tipo de capa según el tipo de input
                 if self.file_type == 'ortoimagen' and layer.type() == 1:  # Raster
                     print('Aceptando capa raster en input de ortoimagen')
-                    event.setDropAction(Qt.CopyAction)  # Cambiar a acción de copia
+                    event.setDropAction(Qt.DropAction.CopyAction)  # Cambiar a acción de copia
                     event.accept()  # Usar accept() en lugar de acceptProposedAction()
                 elif self.file_type == 'lotes' and layer.type() == 0:  # Vector
                     print('Aceptando capa vector en input de lotes')
-                    event.setDropAction(Qt.CopyAction)  # Cambiar a acción de copia
+                    event.setDropAction(Qt.DropAction.CopyAction)  # Cambiar a acción de copia
                     event.accept()  # Usar accept() en lugar de acceptProposedAction()
                 else:
                     print(f'Tipo de capa no válido para {self.file_type}')
@@ -862,7 +860,7 @@ class DropLineEdit(QLineEdit):
                             layer = QgsProject.instance().mapLayer(layer_id)
                             if layer:
                                 break
-                except:
+                except Exception:
                     logging.getLogger(__name__).debug(
                         "Fallo no crítico; se continúa.", exc_info=True)
             
@@ -876,7 +874,7 @@ class DropLineEdit(QLineEdit):
                             layer = QgsProject.instance().mapLayer(layer_id)
                             if layer:
                                 break
-                except:
+                except Exception:
                     logging.getLogger(__name__).debug(
                         "Fallo no crítico; se continúa.", exc_info=True)
             
@@ -888,7 +886,7 @@ class DropLineEdit(QLineEdit):
                 if (self.file_type == 'ortoimagen' and layer.type() == 1) or \
                    (self.file_type == 'lotes' and layer.type() == 0):
                     print('Manteniendo arrastre de capa')
-                    event.setDropAction(Qt.CopyAction)  # Cambiar a acción de copia
+                    event.setDropAction(Qt.DropAction.CopyAction)  # Cambiar a acción de copia
                     event.accept()  # Usar accept() en lugar de acceptProposedAction()
             return
 
@@ -912,7 +910,7 @@ class DropLineEdit(QLineEdit):
                             layer = QgsProject.instance().mapLayer(layer_id)
                             if layer:
                                 break
-                except:
+                except Exception:
                     logging.getLogger(__name__).debug(
                         "Fallo no crítico; se continúa.", exc_info=True)
             
@@ -926,7 +924,7 @@ class DropLineEdit(QLineEdit):
                             layer = QgsProject.instance().mapLayer(layer_id)
                             if layer:
                                 break
-                except:
+                except Exception:
                     logging.getLogger(__name__).debug(
                         "Fallo no crítico; se continúa.", exc_info=True)
             
@@ -948,7 +946,7 @@ class DropLineEdit(QLineEdit):
                             padding: 5px;
                         }
                     """)
-                    event.setDropAction(Qt.CopyAction)  # Cambiar a acción de copia
+                    event.setDropAction(Qt.DropAction.CopyAction)  # Cambiar a acción de copia
                     event.accept()  # Usar accept() en lugar de acceptProposedAction()
                 elif self.file_type == 'lotes' and layer.type() == 0:  # Vector
                     print('Aceptando capa vector en input de lotes')
@@ -962,7 +960,7 @@ class DropLineEdit(QLineEdit):
                             padding: 5px;
                         }
                     """)
-                    event.setDropAction(Qt.CopyAction)  # Cambiar a acción de copia
+                    event.setDropAction(Qt.DropAction.CopyAction)  # Cambiar a acción de copia
                     event.accept()  # Usar accept() en lugar de acceptProposedAction()
                 else:
                     print(f'Tipo de capa no válido para {self.file_type}')
@@ -1077,7 +1075,7 @@ class DropLineEdit(QLineEdit):
 
     def keyPressEvent(self, event):
         """Maneja eventos de teclado para copy/paste"""
-        if event.matches(QKeySequence.Paste):
+        if event.matches(QKeySequence.StandardKey.Paste):
             mime_data = self.clipboard.mimeData()
             if mime_data.hasUrls():
                 url = mime_data.urls()[0]
@@ -1116,7 +1114,7 @@ class ResultadosDialog(QtWidgets.QDialog):
             )
             aviso.setWordWrap(True)
             aviso.setStyleSheet("color: #6b7280; font-size: 12px; padding: 24px;")
-            aviso.setAlignment(Qt.AlignCenter)
+            aviso.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(aviso, 1)
         else:
             tabla = QtWidgets.QTableWidget(len(filas), 5)
@@ -1148,7 +1146,7 @@ class ResultadosDialog(QtWidgets.QDialog):
                 for col, valor in enumerate(valores):
                     item = QtWidgets.QTableWidgetItem(valor)
                     if col == 3:
-                        item.setTextAlignment(Qt.AlignCenter)
+                        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                     tabla.setItem(fila, col, item)
 
             tabla.resizeColumnsToContents()
@@ -1185,10 +1183,10 @@ class ClickableLabel(QtWidgets.QLabel):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.setCursor(Qt.PointingHandCursor)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit()
         super().mousePressEvent(event)
 
@@ -1210,7 +1208,7 @@ class ImagenAmpliadaDialog(QtWidgets.QDialog):
         layout.setContentsMargins(10, 10, 10, 10)
 
         etiqueta = QtWidgets.QLabel()
-        etiqueta.setAlignment(Qt.AlignCenter)
+        etiqueta.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(etiqueta, 1)
 
         cerrar = QtWidgets.QPushButton("Cerrar")
@@ -1220,7 +1218,7 @@ class ImagenAmpliadaDialog(QtWidgets.QDialog):
             "QPushButton:hover { background-color: #2563eb; }"
         )
         cerrar.clicked.connect(self.accept)
-        layout.addWidget(cerrar, 0, Qt.AlignRight)
+        layout.addWidget(cerrar, 0, Qt.AlignmentFlag.AlignRight)
 
         # El tamaño de la ventana se ajusta a la pantalla disponible, no a un
         # valor fijo: en una pantalla chica una ventana fija podría no entrar.
@@ -1237,7 +1235,7 @@ class ImagenAmpliadaDialog(QtWidgets.QDialog):
             # proporción dentro del espacio disponible en esta ventana.
             self._movie.jumpToFrame(0)
             nativo = self._movie.currentPixmap().size()
-            objetivo = nativo.scaled(ancho_max - 40, alto_max - 90, Qt.KeepAspectRatio)
+            objetivo = nativo.scaled(ancho_max - 40, alto_max - 90, Qt.AspectRatioMode.KeepAspectRatio)
             self._movie.setScaledSize(objetivo)
             etiqueta.setMovie(self._movie)
             self._movie.start()
@@ -1245,7 +1243,7 @@ class ImagenAmpliadaDialog(QtWidgets.QDialog):
             pixmap = QPixmap(ruta)
             if not pixmap.isNull():
                 etiqueta.setPixmap(pixmap.scaled(
-                    ancho_max - 40, alto_max - 90, Qt.KeepAspectRatio, Qt.SmoothTransformation
+                    ancho_max - 40, alto_max - 90, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
                 ))
 
     def closeEvent(self, event):
@@ -1445,7 +1443,7 @@ class InstructivoDialog(QtWidgets.QDialog):
         for numero, paso in enumerate(self.PASOS):
             boton = QtWidgets.QPushButton(paso["titulo"])
             boton.setCheckable(True)
-            boton.setCursor(Qt.PointingHandCursor)
+            boton.setCursor(Qt.CursorShape.PointingHandCursor)
             boton.setStyleSheet("""
                 QPushButton {
                     text-align: left;
@@ -1484,7 +1482,7 @@ class InstructivoDialog(QtWidgets.QDialog):
         columna.addWidget(self._titulo_paso)
 
         self._imagen = ClickableLabel()
-        self._imagen.setAlignment(Qt.AlignCenter)
+        self._imagen.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._imagen.setMinimumHeight(160)
         self._imagen.setMaximumHeight(200)
         self._imagen.setStyleSheet(
@@ -1497,7 +1495,7 @@ class InstructivoDialog(QtWidgets.QDialog):
         # También clicable: si el usuario le hace clic al texto/ícono en vez de
         # a la imagen de arriba (fácil de confundir), tiene que funcionar igual.
         lupa = ClickableLabel("🔍 Clic en la imagen para ampliarla")
-        lupa.setAlignment(Qt.AlignCenter)
+        lupa.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lupa.setStyleSheet("color: #8a9199; font-size: 10px;")
         lupa.clicked.connect(self._ampliar_imagen)
         columna.addWidget(lupa)
@@ -1577,7 +1575,7 @@ class InstructivoDialog(QtWidgets.QDialog):
         if not self._ruta_imagen_actual:
             return
         dialogo = ImagenAmpliadaDialog(self, self._ruta_imagen_actual, self._titulo_paso.text())
-        dialogo.exec_()
+        dialogo.exec()
 
     def _cargar_imagen(self, nombre_base):
         """Busca la ilustración del paso en la carpeta 'instructivo'.
@@ -1615,7 +1613,7 @@ class InstructivoDialog(QtWidgets.QDialog):
                 self._movie.jumpToFrame(0)
                 nativo = self._movie.currentPixmap().size()
                 if nativo.width() and nativo.height():
-                    objetivo = nativo.scaled(ancho_disponible, alto_disponible, Qt.KeepAspectRatio)
+                    objetivo = nativo.scaled(ancho_disponible, alto_disponible, Qt.AspectRatioMode.KeepAspectRatio)
                     self._movie.setScaledSize(objetivo)
                 self._imagen.setMovie(self._movie)
                 self._movie.start()
@@ -1624,7 +1622,7 @@ class InstructivoDialog(QtWidgets.QDialog):
                 if not pixmap.isNull():
                     self._imagen.setPixmap(pixmap.scaled(
                         ancho_disponible, alto_disponible,
-                        Qt.KeepAspectRatio, Qt.SmoothTransformation
+                        Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
                     ))
             self._imagen.setText("")
             return
@@ -1990,12 +1988,12 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
         if already_accepted:
             self.terms_accepted = True
-            result = QDialog.Accepted
+            result = QDialog.DialogCode.Accepted
         else:
             legal_dialog = LegalNoticeDialog(self)
-            result = legal_dialog.exec_()
+            result = legal_dialog.exec()
 
-        if result == QDialog.Accepted:
+        if result == QDialog.DialogCode.Accepted:
             # Si el usuario acepta los términos y condiciones, continuar con la inicialización normal
             logger.info("Usuario aceptó los términos y condiciones")
             self.terms_accepted = True
@@ -2008,11 +2006,11 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             
             # Mostrar mensaje de advertencia
             warning_dialog = QMessageBox(self)
-            warning_dialog.setIcon(QMessageBox.Warning)
+            warning_dialog.setIcon(QMessageBox.Icon.Warning)
             warning_dialog.setWindowTitle("Aviso")
             warning_dialog.setText("Debe aceptar los términos y condiciones para usar el plugin.")
-            warning_dialog.setStandardButtons(QMessageBox.Ok)
-            warning_dialog.exec_()
+            warning_dialog.setStandardButtons(QMessageBox.StandardButton.Ok)
+            warning_dialog.exec()
             
             # Cerrar el plugin completamente
             logger.info("Cerrando plugin por rechazo de términos")
@@ -2239,7 +2237,7 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                 padding: 2px 4px;
             }
         """)
-        badge.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        badge.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         badge.setMaximumHeight(36)
 
         row = QtWidgets.QHBoxLayout(badge)
@@ -2251,7 +2249,7 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # justo antes de detectar: el orden de los pasos es lo que más influye
         # en la calidad del resultado.
         instructivo_btn = QtWidgets.QPushButton("📖  Instructivo — cómo hacer un buen levantamiento")
-        instructivo_btn.setCursor(Qt.PointingHandCursor)
+        instructivo_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         instructivo_btn.setStyleSheet("""
             QPushButton {
                 color: #002856;
@@ -2267,7 +2265,7 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         instructivo_btn.clicked.connect(self.show_instructivo_dialog)
 
         resultados_btn = QtWidgets.QPushButton("📊")
-        resultados_btn.setCursor(Qt.PointingHandCursor)
+        resultados_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         resultados_btn.setToolTip("Ver resultados de las detecciones")
         resultados_btn.setFixedWidth(28)
         resultados_btn.setStyleSheet("""
@@ -2293,13 +2291,13 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
     def show_instructivo_dialog(self):
         """Abre la guía paso a paso (ver InstructivoDialog)."""
         dialog = InstructivoDialog(self)
-        dialog.exec_()
+        dialog.exec()
 
     def show_resultados_dialog(self):
         """Abre la ventana de resultados (ver ResultadosDialog)."""
         filas = self._recolectar_resultados_deteccion()
         dialog = ResultadosDialog(self, filas)
-        dialog.exec_()
+        dialog.exec()
 
     def _recolectar_resultados_deteccion(self):
         """Junta, de las capas del proyecto, un resumen por cada detección o
@@ -2307,14 +2305,14 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         cuando se puede calcular (necesita el polígono del lote, guardado por
         el plugin como 'LoteSeleccionado_<FID>' mientras dura la sesión)."""
         import re
-        from qgis.core import QgsProject, QgsWkbTypes
+        from qgis.core import QgsProject
 
         filas = []
         proyecto = QgsProject.instance()
         for layer in proyecto.mapLayers().values():
             try:
                 es_de_puntos = (layer.type() == layer.VectorLayer
-                                and layer.geometryType() == QgsWkbTypes.PointGeometry)
+                                and layer.geometryType() == GEOM_PUNTO)
             except Exception:
                 # Una capa rota o de un tipo inesperado no debe cortar el
                 # recorrido: simplemente no se tiene en cuenta.
@@ -2527,7 +2525,7 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                 
                 try:
                     logger.warning(f"Autenticación fallida desde botón: {auth_result['message']}")
-                except:
+                except Exception:
                     print(f"Autenticación fallida desde botón: {auth_result['message']}")
                 
         except Exception as e:
@@ -2651,7 +2649,7 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                 try:
                     if self.saved_lot_layer:
                         QgsProject.instance().removeMapLayer(self.saved_lot_layer.id())
-                except:
+                except Exception:
                     logging.getLogger(__name__).debug(
                         "Fallo no crítico; se continúa.", exc_info=True)
                 delattr(self, 'saved_lot_layer')
@@ -2900,7 +2898,7 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
         browse_action = menu.addAction("Examinar archivo en el disco...")
 
-        chosen = menu.exec_(button.mapToGlobal(button.rect().bottomLeft()))
+        chosen = menu.exec(button.mapToGlobal(button.rect().bottomLeft()))
         if chosen is None:
             return ("cancel", None)
         if chosen is browse_action:
@@ -2927,11 +2925,11 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         Deja elegir una capa ráster ya cargada en QGIS, o explorar el disco si se prefiere.
         """
         try:
-            from qgis.core import QgsMapLayer
+            pass
 
             action, file_path = self._browse_loaded_layers(
                 self.pushButton,
-                lambda lyr: lyr.type() == QgsMapLayer.RasterLayer,
+                lambda lyr: isinstance(lyr, QgsRasterLayer),
                 "No hay capas ráster cargadas en el proyecto",
             )
             if action == "cancel":
@@ -2977,10 +2975,9 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
     def _get_point_layers_in_project(self):
         """Todas las capas de puntos cargadas en el proyecto (candidatas a unificar)."""
-        from qgis.core import QgsMapLayer, QgsWkbTypes
         layers = []
         for layer in QgsProject.instance().mapLayers().values():
-            if layer.type() == QgsMapLayer.VectorLayer and layer.geometryType() == QgsWkbTypes.PointGeometry:
+            if isinstance(layer, QgsVectorLayer) and layer.geometryType() == GEOM_PUNTO:
                 layers.append(layer)
         return layers
 
@@ -3093,7 +3090,6 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         from qgis.core import (QgsVectorLayer, QgsFeature, QgsVectorFileWriter, QgsField,
                                 QgsGeometry, QgsCoordinateTransform)
         from qgis.PyQt.QtCore import QVariant
-        import tempfile
 
         if self.exigir_carpeta_de_resultados() is None:
             return
@@ -3225,13 +3221,13 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         lote es multipolígono (varias partes en una sola feature).
         """
         try:
-            from qgis.core import QgsMapLayer, QgsWkbTypes
+            pass
 
             action, file_path = self._browse_loaded_layers(
                 self.pushButton_2,
                 lambda lyr: (
-                    lyr.type() == QgsMapLayer.VectorLayer
-                    and lyr.geometryType() == QgsWkbTypes.PolygonGeometry
+                    isinstance(lyr, QgsVectorLayer)
+                    and lyr.geometryType() == GEOM_POLIGONO
                 ),
                 "No hay capas de polígonos cargadas en el proyecto",
             )
@@ -3721,7 +3717,7 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                 
                 # Mostrar diálogo de confirmación con la estimación del tamaño del clip
                 confirm_dialog = ConfirmDialog(self, lot_info, image_path, estimated_clip_size_mb)
-                if confirm_dialog.exec_() == QtWidgets.QDialog.Accepted:
+                if confirm_dialog.exec() == QtWidgets.QDialog.Accepted:
                     logger.info("Usuario confirmó la detección")
                     
                     try:
@@ -4027,7 +4023,7 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             self.iface.mapCanvas().selectionChanged.connect(self.on_palm_point_selected)
             
             # Cambiar el cursor para indicar modo de selección
-            self.iface.mapCanvas().setCursor(Qt.CrossCursor)
+            self.iface.mapCanvas().setCursor(Qt.CursorShape.CrossCursor)
             
             # Mostrar mensaje al usuario
             QtWidgets.QMessageBox.information(
@@ -4990,7 +4986,7 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             # Título
             title_label = QtWidgets.QLabel("Configuración de Numeración de Palmas")
             title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #1e3a8a; margin: 10px;")
-            title_label.setAlignment(Qt.AlignCenter)
+            title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(title_label)
 
             # Área con scroll para el contenido (la ventana se muestra a
@@ -4999,7 +4995,7 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             scroll_area = QtWidgets.QScrollArea()
             scroll_area.setWidgetResizable(True)
             scroll_area.setFrameShape(QtWidgets.QFrame.NoFrame)
-            scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
             scroll_content = QtWidgets.QWidget()
             scroll_content_layout = QtWidgets.QVBoxLayout(scroll_content)
             scroll_content_layout.setContentsMargins(0, 0, 0, 0)
@@ -5008,7 +5004,7 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             # Campos de entrada
             fields_layout = QtWidgets.QFormLayout()
             fields_layout.setSpacing(12)
-            fields_layout.setLabelAlignment(Qt.AlignRight)
+            fields_layout.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
             
             # Lote a numerar
             self.lotNumberLineEdit = QtWidgets.QLineEdit()
@@ -5541,7 +5537,7 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             try:
                 if hasattr(self, '_popup_selection_connected') and self._popup_selection_connected:
                     self.iface.mapCanvas().selectionChanged.disconnect(self.on_palm_selected_for_popup)
-            except:
+            except Exception:
                 logging.getLogger(__name__).debug(
                     "Fallo no crítico; se continúa.", exc_info=True)
             
@@ -5915,18 +5911,16 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
     def process_numbering_from_popup(self, dialog):
         """Genera la grilla en tresbolillo cuando se hace clic en 'Procesar Numeración'"""
-        import math
-        from qgis.core import QgsProject, QgsVectorLayer
         
         # Crear y mostrar pantalla de carga
         # Usar la ventana principal de QGIS como padre para evitar problemas de minimización
         main_window = self.iface.mainWindow() if hasattr(self, 'iface') and self.iface else dialog
         progress = QProgressDialog("Procesando numeración de palmas...\nPor favor espere...", "Cancelar", 0, 0, main_window)
         progress.setWindowTitle("Procesando")
-        progress.setWindowModality(Qt.ApplicationModal)  # Cambiar a ApplicationModal en lugar de WindowModal
+        progress.setWindowModality(Qt.WindowModality.ApplicationModal)  # Cambiar a ApplicationModal en lugar de WindowModal
         progress.setMinimumDuration(0)  # Mostrar inmediatamente
         progress.setRange(0, 0)  # Modo indeterminado (barra animada)
-        progress.setWindowFlags(Qt.Dialog | Qt.WindowTitleHint | Qt.CustomizeWindowHint)  # Evitar minimización
+        progress.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.WindowTitleHint | Qt.WindowType.CustomizeWindowHint)  # Evitar minimización
         progress.show()
         QApplication.processEvents()  # Procesar eventos para mostrar el diálogo
         
@@ -6243,7 +6237,7 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             logger.info(f"✓ Capa {temp_layer_name} agregada al proyecto con ID: {temp_layer.id()}")
             
             # Hacer la capa visible pero con estilo sutil (borde sin relleno)
-            from qgis.core import QgsSymbol, QgsSingleSymbolRenderer, QgsSimpleFillSymbolLayer
+            from qgis.core import QgsSymbol, QgsSingleSymbolRenderer
             from qgis.PyQt.QtGui import QColor
             symbol = QgsSymbol.defaultSymbol(temp_layer.geometryType())
             symbol.setColor(QColor(255, 0, 0, 50))  # Rojo semitransparente
@@ -6295,7 +6289,7 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         from qgis.core import QgsVectorLayer, QgsWkbTypes
         if not isinstance(layer, QgsVectorLayer):
             return False
-        if QgsWkbTypes.geometryType(layer.wkbType()) != QgsWkbTypes.PointGeometry:
+        if QgsWkbTypes.geometryType(layer.wkbType()) != GEOM_PUNTO:
             return False
         field_names_lower = [f.name().lower() for f in layer.fields()]
         return 'id' in field_names_lower
@@ -6305,7 +6299,7 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         from qgis.core import QgsVectorLayer, QgsWkbTypes
         if not isinstance(layer, QgsVectorLayer):
             return False
-        if QgsWkbTypes.geometryType(layer.wkbType()) != QgsWkbTypes.PointGeometry:
+        if QgsWkbTypes.geometryType(layer.wkbType()) != GEOM_PUNTO:
             return False
         name = layer.name()
         return name.startswith('detector_palmas_FID') or name.startswith('palmas_')
@@ -6393,7 +6387,7 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         edición aunque ese se mueva: los dos son parte del mismo paso (revisar y
         corregir la detección antes de numerar)."""
         boton = QtWidgets.QPushButton("Resaltar desviaciones")
-        boton.setCursor(Qt.PointingHandCursor)
+        boton.setCursor(Qt.CursorShape.PointingHandCursor)
         boton.setToolTip(
             "Marca en naranja las palmas cuya ubicación no sigue el patrón de siembra "
             "del lote. Es una ayuda visual para saber dónde revisar: no modifica ningún "
@@ -6631,7 +6625,7 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             )
             return
 
-        QApplication.setOverrideCursor(Qt.WaitCursor)
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
             marcados, detalle = self._find_deviated_palms(layer)
         finally:
@@ -7233,8 +7227,8 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         Se usa tanto en la capa que sale de numerar un lote como en la capa
         unificada: si los puntos traen línea y palma, se rotulan igual, venga de
         donde venga la capa."""
-        from qgis.core import (QgsSymbol, QgsSingleSymbolRenderer, QgsPalLayerSettings,
-                               QgsTextFormat, QgsTextBufferSettings, QgsVectorLayerSimpleLabeling)
+        from qgis.core import (QgsPalLayerSettings, QgsTextFormat, QgsTextBufferSettings,
+                               QgsVectorLayerSimpleLabeling)
         from qgis.PyQt.QtGui import QColor, QFont
 
         try:

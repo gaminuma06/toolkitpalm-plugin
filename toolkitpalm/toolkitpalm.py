@@ -82,7 +82,7 @@ class ToolkitPalm:
             # distinguimos este caso, el chequeo de abajo lo detecta como "ya
             # visible" y lo oculta en el mismo clic que lo crea (primer clic
             # parece no hacer nada, hay que volver a hacer clic).
-            self.iface.addDockWidget(Qt.RightDockWidgetArea, self.dockwidget)
+            self.iface.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.dockwidget)
             just_created = True
 
         if not just_created and self.dockwidget.isVisible():

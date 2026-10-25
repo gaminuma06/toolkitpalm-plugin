@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """Búsqueda de la capa de lotes cargada en el proyecto, compartida por las herramientas."""
+from .compat import GEOM_POLIGONO
 import os
 
-from qgis.core import QgsProject, QgsVectorLayer, QgsWkbTypes
+from qgis.core import QgsProject, QgsVectorLayer
 
 # Un shapefile son varios archivos con el mismo nombre; QGIS abre la capa desde
 # cualquiera de ellos, pero el que la representa es el .shp.
@@ -55,7 +56,7 @@ def buscar_capa_lotes(ruta):
                 return capa, fuente, False
 
     poligonos = [c for c in capas
-                 if c.geometryType() == QgsWkbTypes.PolygonGeometry
+                 if c.geometryType() == GEOM_POLIGONO
                  and fuente_de_capa(c).lower().endswith('.shp')]
     con_seleccion = [c for c in poligonos if c.selectedFeatureCount() > 0]
     if len(con_seleccion) == 1:

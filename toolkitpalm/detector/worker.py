@@ -9,12 +9,9 @@ import zipfile
 import shutil
 import threading
 import time
-from qgis.PyQt.QtCore import QSettings, QCoreApplication, Qt, QTranslator, QTimer, QThread, pyqtSignal, QMetaObject
-from qgis.PyQt.QtGui import QIcon, QColor
-from qgis.PyQt.QtWidgets import (QAction, QMessageBox, QApplication,
-                                QLabel)
-from qgis.core import QgsProject, QgsVectorLayer, QgsRasterLayer, QgsProcessingFeedback, QgsProcessingUtils, QgsApplication, QgsProcessingContext, QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsDistanceArea, Qgis, QgsField, QgsMapLayer, QgsSymbol, QgsSingleSymbolRenderer
-from qgis.PyQt.QtCore import QVariant
+from qgis.PyQt.QtCore import QSettings, QTimer, QThread
+from qgis.PyQt.QtWidgets import (QMessageBox, QApplication)
+from qgis.core import QgsProject, QgsVectorLayer, QgsRasterLayer, QgsProcessingFeedback, QgsProcessingUtils, QgsApplication, QgsProcessingContext, QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsDistanceArea, Qgis, QgsSingleSymbolRenderer
 from .dockwidget import ProgressDialog
 # Detection logger removido - se maneja desde la API
 import logging
@@ -26,11 +23,10 @@ from datetime import datetime
 from ..config import (API_BASE_URL, DETECT_PALMS_ENDPOINT, DETECT_PALMS_ASYNC_ENDPOINT,
                     DETECTOR_STATUS_ENDPOINT as STATUS_ENDPOINT,
                     DETECTOR_RESULT_ENDPOINT as RESULT_ENDPOINT,
-                    DETECTOR_QUEUE_STATUS_ENDPOINT as QUEUE_STATUS_ENDPOINT,
-                    DETECTOR_PROGRESS_ENDPOINT as PROGRESS_ENDPOINT,
                     DETECTOR_QUEUE_POLLING_INTERVAL as QUEUE_POLLING_INTERVAL,
                     DETECTOR_QUEUE_TIMEOUT as QUEUE_TIMEOUT,
-                    UPLOAD_METHOD, UPLOAD_TIMEOUT, UPLOAD_PROGRESS_INTERVAL, API_KEY)
+                    UPLOAD_TIMEOUT,
+                    API_KEY)
 
 
 def _cabeceras_autenticacion():
@@ -173,8 +169,8 @@ def _ensure_rgb_raster(raster_path, progress_callback=None):
     return raster_path
 
 
+from .. import resources  # noqa: F401  (registra los iconos de Qt)
 # Initialize Qt resources from file resources.py
-from ..resources import *
 
 # Configurar logging con ruta segura
 def setup_logging():
@@ -776,7 +772,6 @@ class LocalDetector:
                 # Método 2: Intentar con QgsProcessing (versiones intermedias)
                 if not result:
                     try:
-                        from qgis.core import QgsProcessing
                         if hasattr(QgsProcessing, 'runAlgorithm'):
                             result = QgsProcessing.runAlgorithm(alg_name, params)
                             logger.info("Algoritmo ejecutado con QgsProcessing")
@@ -1896,7 +1891,7 @@ class LocalDetector:
             
             # Iniciar la detección en un hilo separado usando cola async
             def detection_thread():
-                nonlocal temp_dir, output_shapefile, request_id, lot_id_normalized
+                nonlocal temp_dir, output_shapefile
                 job_id = None
                 try:
                     logger.info(f"[THREAD] Hilo de detección iniciado")
@@ -2091,7 +2086,7 @@ class LocalDetector:
                                     try:
                                         error_json = result_response.json()
                                         error_detail = error_json.get('detail', error_detail)
-                                    except:
+                                    except Exception:
                                         logging.getLogger(__name__).debug(
                                             "Fallo no crítico; se continúa.", exc_info=True)
                                     raise Exception(f"Error descargando resultado después de {max_result_retries} intentos: {result_response.status_code} - {error_detail}")
@@ -2776,10 +2771,10 @@ def _preguntar_si_reanudar(dockwidget, lotes_path, lot_id):
         f"(≈{pendientes * LocalDetector.MAX_SUBAREA_HA:.0f} ha).\n\n"
         "¿Continuar donde quedó? (No se vuelven a procesar ni a cobrar los bloques ya hechos).\n\n"
         "Si eliges 'No', se procesa el lote completo desde cero.",
-        QMessageBox.Yes | QMessageBox.No,
-        QMessageBox.Yes,
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        QMessageBox.StandardButton.Yes,
     )
-    if respuesta == QMessageBox.Yes:
+    if respuesta == QMessageBox.StandardButton.Yes:
         return True
     borrar_estado_pendiente(lotes_path, lot_id)
     return False
@@ -2823,7 +2818,7 @@ def _confirmar_creditos_suficientes(dockwidget, lotes_path, lot_id, reanudar):
 
         ha_alcanza = saldo * LocalDetector.MAX_SUBAREA_HA
         caja = QMessageBox(dockwidget)
-        caja.setIcon(QMessageBox.Warning)
+        caja.setIcon(QMessageBox.Icon.Warning)
         caja.setWindowTitle("Créditos insuficientes para el lote completo")
         caja.setText(
             f"Este lote necesita {necesarios} créditos ({estimacion['area_ha']:.1f} ha) "
@@ -2831,10 +2826,10 @@ def _confirmar_creditos_suficientes(dockwidget, lotes_path, lot_id, reanudar):
             f"Puedes procesar ahora unas {ha_alcanza:.0f} ha ({saldo} de {necesarios} bloques) "
             "y continuar después donde quede, sin reprocesar lo ya hecho."
         )
-        btn_seguir = caja.addButton("Procesar hasta donde alcance", QMessageBox.AcceptRole)
-        btn_comprar = caja.addButton("Comprar créditos", QMessageBox.ActionRole)
-        caja.addButton("Cancelar", QMessageBox.RejectRole)
-        caja.exec_()
+        btn_seguir = caja.addButton("Procesar hasta donde alcance", QMessageBox.ButtonRole.AcceptRole)
+        btn_comprar = caja.addButton("Comprar créditos", QMessageBox.ButtonRole.ActionRole)
+        caja.addButton("Cancelar", QMessageBox.ButtonRole.RejectRole)
+        caja.exec()
 
         if caja.clickedButton() is btn_seguir:
             return True
@@ -2920,22 +2915,22 @@ def run_detection(dockwidget):
                     f"El lote quedó completo en la capa nueva.\n\n"
                     f"¿Quitar la capa incompleta anterior ('{capa_vieja}')?\n"
                     "Sus puntos ya están incluidos en la capa nueva.",
-                    QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
-                if respuesta == QMessageBox.Yes:
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.Yes)
+                if respuesta == QMessageBox.StandardButton.Yes:
                     for capa in encontradas:
                         QgsProject.instance().removeMapLayer(capa.id())
 
         if result.get("aviso"):
             caja = QMessageBox(dockwidget)
-            caja.setIcon(QMessageBox.Warning)
+            caja.setIcon(QMessageBox.Icon.Warning)
             caja.setWindowTitle("Procesamiento parcial")
             caja.setText(result["aviso"])
             if result.get("bloques_pendientes"):
-                btn_comprar = caja.addButton("Comprar créditos", QMessageBox.ActionRole)
+                btn_comprar = caja.addButton("Comprar créditos", QMessageBox.ButtonRole.ActionRole)
             else:
                 btn_comprar = None
-            caja.addButton("Entendido", QMessageBox.AcceptRole)
-            caja.exec_()
+            caja.addButton("Entendido", QMessageBox.ButtonRole.AcceptRole)
+            caja.exec()
             if btn_comprar is not None and caja.clickedButton() is btn_comprar:
                 from qgis.PyQt.QtGui import QDesktopServices
                 from qgis.PyQt.QtCore import QUrl

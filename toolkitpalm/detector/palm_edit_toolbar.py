@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
+from ..common.compat import GEOM_PUNTO
 import logging
 from qgis.PyQt.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QPushButton,
                                   QLabel, QLineEdit, QMessageBox)
 from qgis.PyQt.QtCore import Qt, pyqtSignal, QVariant
-from qgis.PyQt.QtGui import QColor, QPalette, QPainter
+from qgis.PyQt.QtGui import QColor, QPainter
 from qgis.gui import QgsMapTool, QgsRubberBand
 from qgis.core import (QgsFeature, QgsGeometry, QgsPointXY, QgsField, QgsVectorLayer,
-                       QgsProject, QgsCoordinateTransform, QgsWkbTypes)
+                       QgsProject, QgsCoordinateTransform)
 
 # Ciclo del botón "Estado": lo que está para revisar se confirma como viva o
 # muerta; viva y muerta se alternan.
@@ -61,7 +62,7 @@ class AddPalmTool(QgsMapTool):
 
     def __init__(self, canvas):
         super().__init__(canvas)
-        self.setCursor(Qt.CrossCursor)
+        self.setCursor(Qt.CursorShape.CrossCursor)
 
     def canvasPressEvent(self, event):
         self.point_clicked.emit(self.toMapCoordinates(event.pos()))
@@ -72,7 +73,7 @@ class DeletePalmTool(_NearestMixin, QgsMapTool):
         QgsMapTool.__init__(self, canvas)
         self._layer    = layer
         self._id_field = id_field
-        self.setCursor(Qt.ForbiddenCursor)
+        self.setCursor(Qt.CursorShape.ForbiddenCursor)
 
     def canvasPressEvent(self, event):
         point = self.toMapCoordinates(event.pos())
@@ -83,9 +84,9 @@ class DeletePalmTool(_NearestMixin, QgsMapTool):
         reply = QMessageBox.question(
             None, "Eliminar palma",
             f"¿Eliminar esta palma (ID: {feat[self._id_field]})?",
-            QMessageBox.Yes | QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             self._layer.deleteFeature(feat.id())
 
 
@@ -95,7 +96,7 @@ class EditIdTool(_NearestMixin, QgsMapTool):
     def __init__(self, canvas, layer):
         QgsMapTool.__init__(self, canvas)
         self._layer = layer
-        self.setCursor(Qt.PointingHandCursor)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
 
     def canvasPressEvent(self, event):
         point = self.toMapCoordinates(event.pos())
@@ -114,7 +115,7 @@ class MovePalmTool(_NearestMixin, QgsMapTool):
         self._moving_feat = None
         self._rubber_band = None
         self._press_pos   = None
-        self.setCursor(Qt.SizeAllCursor)
+        self.setCursor(Qt.CursorShape.SizeAllCursor)
 
     # ── CRS helpers ───────────────────────────────────────────────────────────
 
@@ -143,7 +144,7 @@ class MovePalmTool(_NearestMixin, QgsMapTool):
         self._moving_feat = feat
         self._press_pos   = event.pos()
 
-        self._rubber_band = QgsRubberBand(self.canvas(), QgsWkbTypes.PointGeometry)
+        self._rubber_band = QgsRubberBand(self.canvas(), GEOM_PUNTO)
         self._rubber_band.setColor(QColor('#00A9E0'))
         self._rubber_band.setIconSize(14)
         self._rubber_band.setWidth(3)
@@ -153,7 +154,7 @@ class MovePalmTool(_NearestMixin, QgsMapTool):
     def canvasMoveEvent(self, event):
         if self._moving_feat is None or self._rubber_band is None:
             return
-        self._rubber_band.reset(QgsWkbTypes.PointGeometry)
+        self._rubber_band.reset(GEOM_PUNTO)
         self._rubber_band.addPoint(self.toMapCoordinates(event.pos()))
 
     def canvasReleaseEvent(self, event):
@@ -211,7 +212,7 @@ class PalmEditToolbar(QWidget):
             layer.fields().indexOf('Palma') >= 0
         )
 
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
 
         if self._numbered_mode:
             self._asegurar_campos_estado()
@@ -512,11 +513,11 @@ class PalmEditToolbar(QWidget):
         dialogo.setWindowTitle("Rellenar hueco")
         dialogo.setText(f"En este hueco de la línea {linea} caben {n} palmas.\n\n"
                         "¿Qué es este hueco?")
-        b_muertas = dialogo.addButton("Muertas (erradicadas)", QMessageBox.AcceptRole)
-        b_vivas = dialogo.addButton("Vivas", QMessageBox.AcceptRole)
-        b_quitar = dialogo.addButton("No son palmas: quitar hueco", QMessageBox.DestructiveRole)
-        dialogo.addButton("Cancelar", QMessageBox.RejectRole)
-        dialogo.exec_()
+        b_muertas = dialogo.addButton("Muertas (erradicadas)", QMessageBox.ButtonRole.AcceptRole)
+        b_vivas = dialogo.addButton("Vivas", QMessageBox.ButtonRole.AcceptRole)
+        b_quitar = dialogo.addButton("No son palmas: quitar hueco", QMessageBox.ButtonRole.DestructiveRole)
+        dialogo.addButton("Cancelar", QMessageBox.ButtonRole.RejectRole)
+        dialogo.exec()
         elegido = dialogo.clickedButton()
         if elegido is b_quitar:
             self._quitar_hueco(hueco)
@@ -712,8 +713,8 @@ class PalmEditToolbar(QWidget):
             f"¿Quitar el hueco de la línea {hueco['Linea']}?\n\n"
             "Se quita ahora y no se puede deshacer con el botón Deshacer. "
             "Si se quita por error, se recupera numerando de nuevo el lote.",
-            QMessageBox.Yes | QMessageBox.No)
-        if respuesta != QMessageBox.Yes:
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if respuesta != QMessageBox.StandardButton.Yes:
             return
         huecos = self._capa_huecos()
         if huecos is None:

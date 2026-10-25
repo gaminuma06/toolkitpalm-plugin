@@ -28,7 +28,6 @@ from .common.colors import AZUL_OSCURO, AZUL_MEDIO, AZUL_CLARO, BEIGE_ARENA
 from .config import (
     ASSISTANT_DEFAULT_PROVIDER, ASSISTANT_CLAUDE_MODEL, ANTHROPIC_API_KEY,
     ASSISTANT_CUSTOM_MODEL, ASSISTANT_CUSTOM_BASE_URL, ASSISTANT_CUSTOM_API_KEY,
-    CREDITS_PURCHASE_URL,
 )
 from . import client_identity
 
@@ -346,7 +345,7 @@ class ToolkitPalmDockWidget(QDockWidget):
     def _title_bar_button(self, text, tooltip):
         button = QPushButton(text)
         button.setFlat(True)
-        button.setCursor(Qt.PointingHandCursor)
+        button.setCursor(Qt.CursorShape.PointingHandCursor)
         button.setToolTip(tooltip)
         button.setStyleSheet(
             "QPushButton { color: #cfe3f2; background: transparent; border: none; "
@@ -378,19 +377,19 @@ class ToolkitPalmDockWidget(QDockWidget):
 
         name_label = QLabel("ToolkitPalm")
         name_label.setObjectName("tituloPlugin")
-        name_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        name_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         # Sin esto el diseño lo encoge cuando el panel está angosto y el texto
         # sale cortado (se veía "alm" en vez de "ToolkitPalm").
-        name_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        name_label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         name_label.setStyleSheet(
             "color: #ffffff; font-size: 14px; font-weight: bold; background: transparent;"
         )
         # El color también por paleta: con solo la hoja de estilos el texto salía
         # del mismo color del fondo azul (invisible) según el tema de QGIS.
-        from qgis.PyQt.QtGui import QPalette, QColor, QFont
+        from qgis.PyQt.QtGui import QPalette, QColor
         paleta = name_label.palette()
-        paleta.setColor(QPalette.WindowText, QColor("#ffffff"))
-        paleta.setColor(QPalette.Text, QColor("#ffffff"))
+        paleta.setColor(QPalette.ColorRole.WindowText, QColor("#ffffff"))
+        paleta.setColor(QPalette.ColorRole.Text, QColor("#ffffff"))
         name_label.setPalette(paleta)
         fuente = name_label.font()
         fuente.setBold(True)
@@ -398,17 +397,17 @@ class ToolkitPalmDockWidget(QDockWidget):
         name_label.setFont(fuente)
         name_label.setMinimumWidth(name_label.fontMetrics().horizontalAdvance("ToolkitPalm") + 8)
         name_label.setToolTip("ToolkitPalm — herramientas de palma de aceite para QGIS")
-        layout.addWidget(name_label, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        layout.addWidget(name_label, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
         layout.addStretch(1)
 
         self._name_label = QLabel("")
         self._name_label.setStyleSheet("color: #ffffff; font-size: 11px; background: transparent;")
-        layout.addWidget(self._name_label, 0, Qt.AlignRight)
+        layout.addWidget(self._name_label, 0, Qt.AlignmentFlag.AlignRight)
 
         self._credits_label = QPushButton("")
         self._credits_label.setFlat(True)
-        self._credits_label.setCursor(Qt.PointingHandCursor)
+        self._credits_label.setCursor(Qt.CursorShape.PointingHandCursor)
         self._credits_label.setStyleSheet(
             "QPushButton { color: #9fe6a0; background: transparent; border: none; "
             "font-size: 11px; font-weight: bold; padding: 0 4px; }"
@@ -418,15 +417,15 @@ class ToolkitPalmDockWidget(QDockWidget):
         )
         self._credits_label.setToolTip("Ver saldo y comprar más créditos")
         self._credits_label.clicked.connect(self._on_credits_clicked)
-        layout.addWidget(self._credits_label, 0, Qt.AlignRight)
+        layout.addWidget(self._credits_label, 0, Qt.AlignmentFlag.AlignRight)
 
         self._login_label = QLabel("Iniciar sesión")
         self._login_label.setStyleSheet(
             "color: #cfe3f2; font-size: 11px; background: transparent; text-decoration: underline;"
         )
-        self._login_label.setCursor(Qt.PointingHandCursor)
+        self._login_label.setCursor(Qt.CursorShape.PointingHandCursor)
         self._login_label.mousePressEvent = lambda event: self._on_login_clicked()
-        layout.addWidget(self._login_label, 0, Qt.AlignRight)
+        layout.addWidget(self._login_label, 0, Qt.AlignmentFlag.AlignRight)
 
         self._refresh_login_ui()
 
@@ -435,14 +434,14 @@ class ToolkitPalmDockWidget(QDockWidget):
             "Recargar el plugin (para aplicar una actualización sin cerrar QGIS)",
         )
         reload_button.clicked.connect(self._on_reload_plugin_clicked)
-        layout.addWidget(reload_button, 0, Qt.AlignRight)
+        layout.addWidget(reload_button, 0, Qt.AlignmentFlag.AlignRight)
 
         collapse_button = self._title_bar_button(
             "»",
             "Contraer hacia la derecha (sigue conectado, solo se reduce a una franja)",
         )
         collapse_button.clicked.connect(self._on_toggle_collapse)
-        layout.addWidget(collapse_button, 0, Qt.AlignRight)
+        layout.addWidget(collapse_button, 0, Qt.AlignmentFlag.AlignRight)
 
         hide_button = self._title_bar_button(
             "✕",
@@ -450,7 +449,7 @@ class ToolkitPalmDockWidget(QDockWidget):
             "vuelve a abrir el panel desde el botón de la barra de herramientas)",
         )
         hide_button.clicked.connect(self.ocultar_panel)
-        layout.addWidget(hide_button, 0, Qt.AlignRight)
+        layout.addWidget(hide_button, 0, Qt.AlignmentFlag.AlignRight)
 
         self._title_bar_full = title_widget
 
@@ -474,12 +473,12 @@ class ToolkitPalmDockWidget(QDockWidget):
         capa.setObjectName("capaLogin")
 
         disposicion = QVBoxLayout(capa)
-        disposicion.setAlignment(Qt.AlignCenter)
+        disposicion.setAlignment(Qt.AlignmentFlag.AlignCenter)
         disposicion.setContentsMargins(24, 24, 24, 24)
         disposicion.setSpacing(14)
 
         titulo = QLabel("Inicia sesión para usar ToolkitPalm")
-        titulo.setAlignment(Qt.AlignCenter)
+        titulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         titulo.setWordWrap(True)
         titulo.setStyleSheet(
             f"color: {AZUL_OSCURO}; font-size: 15px; font-weight: bold; background: transparent;"
@@ -490,20 +489,20 @@ class ToolkitPalmDockWidget(QDockWidget):
             "Tu cuenta de Google identifica tus créditos de procesamiento y guarda "
             "tu saldo aunque cambies de computador."
         )
-        explicacion.setAlignment(Qt.AlignCenter)
+        explicacion.setAlignment(Qt.AlignmentFlag.AlignCenter)
         explicacion.setWordWrap(True)
         explicacion.setStyleSheet("color: #4b5563; font-size: 12px; background: transparent;")
         disposicion.addWidget(explicacion)
 
         boton = QPushButton("Iniciar sesión con Google")
-        boton.setCursor(Qt.PointingHandCursor)
+        boton.setCursor(Qt.CursorShape.PointingHandCursor)
         boton.setStyleSheet(
             "QPushButton { background-color: #1a73e8; color: white; border: none; "
             "padding: 10px 18px; border-radius: 4px; font-size: 13px; font-weight: bold; }"
             "QPushButton:hover { background-color: #1765cc; }"
         )
         boton.clicked.connect(self._on_login_clicked)
-        disposicion.addWidget(boton, 0, Qt.AlignCenter)
+        disposicion.addWidget(boton, 0, Qt.AlignmentFlag.AlignCenter)
 
         capa.hide()
         return capa
@@ -512,7 +511,7 @@ class ToolkitPalmDockWidget(QDockWidget):
         """Mantiene la capa de login cubriendo todo el panel cuando cambia de tamaño."""
         try:
             from qgis.PyQt.QtCore import QEvent
-            if (objeto is self._full_body and evento.type() == QEvent.Resize
+            if (objeto is self._full_body and evento.type() == QEvent.Type.Resize
                     and getattr(self, "_overlay_login", None)):
                 self._overlay_login.setGeometry(self._full_body.rect())
         except Exception:
@@ -641,8 +640,8 @@ class ToolkitPalmDockWidget(QDockWidget):
             "el plugin te avisamos cuando lleguen.\n\n"
             "Si cierras la ventana del pago o lo rechazan, no se cobra nada y tu "
             "saldo queda igual.",
-            QMessageBox.Ok | QMessageBox.Cancel, QMessageBox.Ok)
-        if respuesta != QMessageBox.Ok:
+            QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel, QMessageBox.StandardButton.Ok)
+        if respuesta != QMessageBox.StandardButton.Ok:
             return
         QDesktopServices.openUrl(QUrl(datos["url"]))
         self._vigilar_pago()
@@ -814,7 +813,7 @@ class ToolkitPalmDockWidget(QDockWidget):
                 continue
             boton.setEnabled(admin)
             boton.setStyleSheet(_CARD_STYLE_ADMIN if admin else _CARD_STYLE_DISABLED)
-            boton.setCursor(Qt.PointingHandCursor if admin else Qt.ArrowCursor)
+            boton.setCursor(Qt.CursorShape.PointingHandCursor if admin else Qt.CursorShape.ArrowCursor)
             boton.setToolTip(
                 "En construcción: solo tú puedes abrirla para probarla y seguir "
                 "desarrollándola." if admin else
@@ -854,9 +853,9 @@ class ToolkitPalmDockWidget(QDockWidget):
                 self, "Cerrar sesión",
                 "¿Cerrar sesión? Tu saldo de créditos no se pierde — vuelve a "
                 "aparecer si inicias sesión con la misma cuenta.",
-                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
-            if reply != QMessageBox.Yes:
+            if reply != QMessageBox.StandardButton.Yes:
                 return
             google_auth.cerrar_sesion()
             client_identity.clear_display_name()
@@ -882,13 +881,13 @@ class ToolkitPalmDockWidget(QDockWidget):
         from . import google_auth
 
         espera = QMessageBox(self)
-        espera.setIcon(QMessageBox.Information)
+        espera.setIcon(QMessageBox.Icon.Information)
         espera.setWindowTitle("Iniciar sesión con Google")
         espera.setText(
             "Se abrió tu navegador para que inicies sesión con Google.\n\n"
             "Cuando termines allá, esta ventana se cierra sola."
         )
-        espera.setStandardButtons(QMessageBox.Cancel)
+        espera.setStandardButtons(QMessageBox.StandardButton.Cancel)
         espera.show()
         QApplication.processEvents()
 
@@ -1014,7 +1013,7 @@ class ToolkitPalmDockWidget(QDockWidget):
 
         expand_button = QPushButton("«")
         expand_button.setFlat(True)
-        expand_button.setCursor(Qt.PointingHandCursor)
+        expand_button.setCursor(Qt.CursorShape.PointingHandCursor)
         expand_button.setToolTip("Expandir ToolkitPalm")
         expand_button.setFixedWidth(26)
         expand_button.setStyleSheet(
@@ -1022,7 +1021,7 @@ class ToolkitPalmDockWidget(QDockWidget):
             f"QPushButton:hover {{ color: {AZUL_MEDIO}; }}"
         )
         expand_button.clicked.connect(self._on_toggle_collapse)
-        layout.addWidget(expand_button, 0, Qt.AlignHCenter)
+        layout.addWidget(expand_button, 0, Qt.AlignmentFlag.AlignHCenter)
         layout.addStretch(1)
         return strip
 
@@ -1089,19 +1088,19 @@ class ToolkitPalmDockWidget(QDockWidget):
 
         for key, label in _TOOLS:
             button = QPushButton(label)
-            button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             button.setMinimumHeight(38)
             if key in _DISABLED_TOOLS and key not in _TOOLS_SOLO_ADMIN:
                 button.setCheckable(False)
                 button.setFlat(True)
                 button.setEnabled(False)
-                button.setCursor(Qt.ArrowCursor)
+                button.setCursor(Qt.CursorShape.ArrowCursor)
                 button.setStyleSheet(_CARD_STYLE_DISABLED)
                 button.setToolTip("Todavía no está disponible — se desarrollará más adelante.")
             else:
                 button.setCheckable(True)
                 button.setFlat(True)
-                button.setCursor(Qt.PointingHandCursor)
+                button.setCursor(Qt.CursorShape.PointingHandCursor)
                 button.setStyleSheet(_CARD_STYLE)
                 button.clicked.connect(lambda _checked, k=key: self._on_card_clicked(k))
                 self._button_group.addButton(button)
@@ -1119,7 +1118,7 @@ class ToolkitPalmDockWidget(QDockWidget):
 
         # Firma del autor, al pie de la columna de herramientas.
         autoria = QLabel("Desarrollado por Ing. Adán Arias")
-        autoria.setAlignment(Qt.AlignCenter)
+        autoria.setAlignment(Qt.AlignmentFlag.AlignCenter)
         autoria.setWordWrap(True)
         autoria.setStyleSheet(
             f"color: {AZUL_OSCURO}; font-size: 10px; font-weight: bold; "
@@ -1136,7 +1135,7 @@ class ToolkitPalmDockWidget(QDockWidget):
         layout = QVBoxLayout(page)
         label = QLabel("Selecciona una herramienta en el panel de la izquierda.")
         label.setWordWrap(True)
-        label.setAlignment(Qt.AlignCenter)
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         label.setStyleSheet(f"color: {AZUL_OSCURO}; font-size: 13px; padding: 24px;")
         layout.addStretch(1)
         layout.addWidget(label)
@@ -1159,7 +1158,7 @@ class ToolkitPalmDockWidget(QDockWidget):
         layout = QVBoxLayout(content)
         label = QLabel(f"<b style='font-size:15px;'>{titulo}</b><br><br>{mensaje}")
         label.setWordWrap(True)
-        label.setAlignment(Qt.AlignCenter)
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         label.setStyleSheet(f"color: {AZUL_OSCURO}; font-size: 13px; padding: 24px;")
         layout.addStretch(1)
         layout.addWidget(label)
@@ -1194,7 +1193,7 @@ class ToolkitPalmDockWidget(QDockWidget):
             "de tu modelo propio) y presiona \"Guardar configuración\" para activar el chat."
         )
         self._chat_placeholder.setWordWrap(True)
-        self._chat_placeholder.setAlignment(Qt.AlignCenter)
+        self._chat_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._chat_placeholder.setStyleSheet(f"color: {AZUL_MEDIO}; font-size: 12px; padding: 24px;")
         layout.addWidget(self._chat_placeholder, 1)
 
@@ -1299,7 +1298,7 @@ class ToolkitPalmDockWidget(QDockWidget):
         claude_form_layout = QFormLayout(self._claude_form)
         claude_form_layout.setContentsMargins(0, 4, 0, 0)
         self._claude_api_key_edit = QLineEdit()
-        self._claude_api_key_edit.setEchoMode(QLineEdit.Password)
+        self._claude_api_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self._claude_api_key_edit.setPlaceholderText("sk-ant-...")
         claude_form_layout.addRow("Clave de API:", self._claude_api_key_edit)
         self._claude_model_combo = QComboBox()
@@ -1327,7 +1326,7 @@ class ToolkitPalmDockWidget(QDockWidget):
         self._custom_model_edit = QLineEdit()
         custom_form_layout.addRow("Modelo:", self._custom_model_edit)
         self._custom_api_key_edit = QLineEdit()
-        self._custom_api_key_edit.setEchoMode(QLineEdit.Password)
+        self._custom_api_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self._custom_api_key_edit.setPlaceholderText("(opcional)")
         custom_form_layout.addRow("Clave de API:", self._custom_api_key_edit)
         box_layout.addWidget(self._custom_form)
@@ -1384,7 +1383,7 @@ class ToolkitPalmDockWidget(QDockWidget):
         clave_row.addWidget(QLabel("Clave de acceso:"))
         self._mcp_token_field = QLineEdit()
         self._mcp_token_field.setReadOnly(True)
-        self._mcp_token_field.setEchoMode(QLineEdit.Password)
+        self._mcp_token_field.setEchoMode(QLineEdit.EchoMode.Password)
         self._mcp_token_field.setToolTip(
             "Pégala en la configuración de tu cliente MCP. No la compartas: "
             "quien la tenga puede operar tu QGIS mientras la conexión esté activa."
@@ -1397,7 +1396,7 @@ class ToolkitPalmDockWidget(QDockWidget):
         ver_button.setToolTip("Mostrar u ocultar la clave")
         ver_button.toggled.connect(
             lambda visible: self._mcp_token_field.setEchoMode(
-                QLineEdit.Normal if visible else QLineEdit.Password))
+                QLineEdit.EchoMode.Normal if visible else QLineEdit.EchoMode.Password))
         clave_row.addWidget(ver_button)
 
         copiar_button = QPushButton("Copiar")
@@ -1426,7 +1425,7 @@ class ToolkitPalmDockWidget(QDockWidget):
         self._mcp_instructions_browser.setOpenExternalLinks(False)
         self._mcp_instructions_browser.setOpenLinks(False)
         self._mcp_instructions_browser.anchorClicked.connect(self._on_mcp_instructions_link_clicked)
-        self._mcp_instructions_browser.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._mcp_instructions_browser.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._mcp_instructions_browser.setStyleSheet(
             "background-color: white; border: 1px solid #d9dcdf; font-size: 13px;"
         )
@@ -1576,8 +1575,8 @@ class ToolkitPalmDockWidget(QDockWidget):
             "Se generará una clave nueva.\n\n"
             "Los clientes que ya tengas configurados con la clave anterior "
             "dejarán de conectarse hasta que los actualices.\n\n¿Continuar?",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-        if respuesta != QMessageBox.Yes:
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
+        if respuesta != QMessageBox.StandardButton.Yes:
             return
         token_de_esta_instalacion(regenerar=True)
         self._refrescar_token_mcp()
@@ -2039,9 +2038,9 @@ class ToolkitPalmDockWidget(QDockWidget):
         # llegar a él.
         page = QScrollArea()
         page.setWidgetResizable(True)
-        page.setFrameShape(QFrame.NoFrame)
-        page.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        page.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        page.setFrameShape(QFrame.Shape.NoFrame)
+        page.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        page.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         page.setWidget(contenido)      # reparenta el contenido y lo saca del dock
 
         self._stacked.addWidget(page)

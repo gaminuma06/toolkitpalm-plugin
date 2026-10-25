@@ -5,7 +5,7 @@
 name=ToolkitPalm
 qgisMinimumVersion=3.16
 description=Detect, count and number oil palm trees, and trim the empty borders of drone orthomosaics.
-version=1.1.0
+version=1.1.1
 author=Ing. Adán Arias
 email=ingarias9006@gmail.com
 
@@ -30,7 +30,8 @@ homepage=https://github.com/gaminuma06/toolkitpalm-plugin
 # Recommended items:
 hasProcessingProvider=no
 
-changelog=1.1.0 - New processing server (api.adanarias.com): detection, numbering and border trimming work again for everyone.
+changelog=1.1.1 - Ready for QGIS 4 (Qt6), still works on QGIS 3. Code cleanup.
+    1.1.0 - New processing server (api.adanarias.com): detection, numbering and border trimming work again for everyone.
     - All processing now runs on the server; the plugin only contains the interface.
     - New tool: Trim orthomosaic borders.
     - Numbering by planting row, missing palms and manual editing.

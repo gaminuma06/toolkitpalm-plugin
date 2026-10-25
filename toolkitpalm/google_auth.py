@@ -165,7 +165,6 @@ def iniciar_sesion(timeout_segundos: int = 180, al_esperar=None):
 
     Devuelve el perfil {"sub", "email", "name"} o None si no se completó.
     """
-    import requests
     from qgis.PyQt.QtGui import QDesktopServices
     from qgis.PyQt.QtCore import QUrl
 
