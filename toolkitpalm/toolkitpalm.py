@@ -74,6 +74,15 @@ class ToolkitPalm:
         del self.toolbar
 
     def run(self):
+        # Términos obligatorios: se piden al instalar, al actualizar el plugin o
+        # cuando cambia el texto. Sin aceptarlos no se abre el panel.
+        from .common.terminos import pedir_aceptacion
+        if not pedir_aceptacion(self.iface.mainWindow()):
+            from qgis.PyQt.QtWidgets import QMessageBox
+            QMessageBox.information(
+                self.iface.mainWindow(), "ToolkitPalm",
+                "Debe aceptar los términos y condiciones para usar ToolkitPalm.")
+            return
         just_created = False
         if self.dockwidget is None:
             from .shell import ToolkitPalmDockWidget

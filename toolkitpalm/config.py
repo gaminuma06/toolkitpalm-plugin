@@ -160,6 +160,11 @@ CREDITS_REGALAR_ENDPOINT = f"{CREDITS_BASE_URL}/regalar"
 CREDITS_CODIGO_CREAR_ENDPOINT = f"{CREDITS_BASE_URL}/codigos/crear"
 CREDITS_CODIGO_CANJEAR_ENDPOINT = f"{CREDITS_BASE_URL}/codigos/canjear"
 
+# --- Correcciones del cliente ("Validar ajustes"). PENDIENTE: el endpoint aun no
+#     existe en el servidor; hay que crearlo antes de publicar esta funcion. ---
+CORRECCIONES_VALIDAR_ENDPOINT = os.environ.get(
+    "TOOLKITPALM_CORRECCIONES_ENDPOINT", f"{API_BASE_URL}/apis/correcciones/validar")
+
 # --- Pagos (backend: app/pagos/router.py) ---
 PAGOS_CHECKOUT_ENDPOINT = f"{API_BASE_URL}/apis/pagos/checkout"
 
@@ -174,30 +179,11 @@ RECORTE_DETECTAR_ENDPOINT = f"{API_BASE_URL}/apis/recorte/detectar"
 # --- Análisis de siembra (backend: app/analisis/router.py) ---
 ANALISIS_BASE_URL = f"{API_BASE_URL}/apis/analisis"
 
-# Correos que ven la opción de regalar créditos dentro del plugin. Va acá y no
-# en el servidor porque solo controla si el botón aparece; el permiso real lo da
-# la clave de administración, que solo existe en el config_secrets del dueño.
-ADMIN_EMAILS = [c.strip().lower() for c in
-                os.environ.get("TOOLKITPALM_ADMIN_EMAILS", "").split(",") if c.strip()]
-ADMIN_API_KEY = os.environ.get("TOOLKITPALM_ADMIN_API_KEY", "")
-
-try:
-    from .config_secrets import (  # type: ignore
-        ADMIN_EMAILS as _ADMIN_EMAILS,
-        ADMIN_API_KEY as _ADMIN_KEY,
-    )
-    if _ADMIN_EMAILS:
-        ADMIN_EMAILS = [c.strip().lower() for c in _ADMIN_EMAILS]
-    if _ADMIN_KEY:
-        ADMIN_API_KEY = _ADMIN_KEY
-except Exception:
-    logging.getLogger(__name__).debug(
-        "Fallo no crítico; se continúa.", exc_info=True)
 # Enlace de compra de paquetes de créditos (25.000 COP = 60 créditos = hasta 300 ha).
 # Placeholder hasta que exista la tienda/pasarela de pago conectada al curso.
 CREDITS_PURCHASE_URL = os.environ.get(
     "TOOLKITPALM_CREDITS_PURCHASE_URL",
-    "https://toolkitpalm.adanarias.com/comprar-creditos"
+    "https://adanarias.com/"
 )
 
 # --- Fotogrametría (Ortofoto/MDE/Curvas) — EN PLANEACIÓN, sin backend todavía ---

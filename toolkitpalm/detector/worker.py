@@ -29,6 +29,25 @@ from ..config import (API_BASE_URL, DETECT_PALMS_ENDPOINT, DETECT_PALMS_ASYNC_EN
                     API_KEY)
 
 
+def _escribir_shp(layer, ruta, crs):
+    """Guarda `layer` como shapefile en `ruta` (reproyectando a `crs` si hace falta).
+    Usa la función nueva de QGIS para no mostrar el aviso de función obsoleta."""
+    from qgis.core import QgsVectorFileWriter, QgsCoordinateTransformContext
+    opciones = QgsVectorFileWriter.SaveVectorOptions()
+    opciones.driverName = "ESRI Shapefile"
+    opciones.fileEncoding = "utf-8"
+    if crs is not None and crs.isValid() and layer.crs() != crs:
+        opciones.ct = QgsCoordinateTransform(layer.crs(), crs, QgsProject.instance())
+    contexto = QgsProject.instance().transformContext()
+    if hasattr(QgsVectorFileWriter, "writeAsVectorFormatV3"):
+        res = QgsVectorFileWriter.writeAsVectorFormatV3(layer, ruta, contexto, opciones)
+    else:
+        res = QgsVectorFileWriter.writeAsVectorFormatV2(layer, ruta, contexto, opciones)
+    if res[0] != QgsVectorFileWriter.NoError:
+        raise Exception(f"No se pudo guardar el shapefile {ruta}: {res[1] if len(res) > 1 else res[0]}")
+    return res
+
+
 def _cabeceras_autenticacion():
     """Cabeceras para hablar con el backend (ver client_identity)."""
     from ..client_identity import cabeceras_autenticacion
@@ -984,13 +1003,7 @@ class LocalDetector:
                         logger.warning("No se pudo calcular el área en hectáreas")
                     
                     # Guardar como shapefile temporal
-                    QgsVectorFileWriter.writeAsVectorFormat(
-                        temp_layer,
-                        temp_shapefile_path,
-                        "utf-8",
-                        output_crs,
-                        "ESRI Shapefile"
-                    )
+                    _escribir_shp(temp_layer, temp_shapefile_path, output_crs)
                     logger.info(f"Shapefile temporal creado: {temp_shapefile_path}")
                     break
             
@@ -1234,7 +1247,7 @@ class LocalDetector:
         provider.addFeatures([feat])
         layer.updateExtents()
 
-        QgsVectorFileWriter.writeAsVectorFormat(layer, out_path, "utf-8", crs, "ESRI Shapefile")
+        _escribir_shp(layer, out_path, crs)
 
     def _merge_point_shapefiles(self, shapefile_paths, out_path, crs):
         """Junta los puntos de varios shapefiles de resultado en uno solo, renumerando 'id'."""
@@ -1272,7 +1285,7 @@ class LocalDetector:
 
         provider.addFeatures(merged_features)
         merged_layer.updateExtents()
-        QgsVectorFileWriter.writeAsVectorFormat(merged_layer, out_path, "utf-8", crs, "ESRI Shapefile")
+        _escribir_shp(merged_layer, out_path, crs)
         return len(merged_features)
 
     def _finalize_output_shapefile(self, shapefile_path, lot_name, lot_geometry, crs, output_folder=None):
@@ -1336,7 +1349,7 @@ class LocalDetector:
                 candidate = os.path.join(carpeta, f"{safe_name}_palmas_{counter}.shp")
                 counter += 1
             try:
-                QgsVectorFileWriter.writeAsVectorFormat(layer, candidate, "utf-8", crs, "ESRI Shapefile")
+                _escribir_shp(layer, candidate, crs)
                 final_path = candidate
             except Exception as e:
                 logger.warning(f"No se pudo guardar en la carpeta de resultados elegida: {str(e)}. Se usa la ruta original.")
@@ -1451,6 +1464,8 @@ class LocalDetector:
             if original_callback:
                 original_callback(3, f"Procesando {total} bloques ({hilos} a la vez)...")
 
+            self._origen_bloques = {}
+            resultado_por_bloque = {}
             with ThreadPoolExecutor(max_workers=hilos) as ejecutor:
                 futuros = {
                     ejecutor.submit(self._procesar_bloque, i, g, image_path, temp_dir, target_crs): (i, g)
@@ -1489,6 +1504,7 @@ class LocalDetector:
                             continue
 
                         if sub_result_path and os.path.exists(sub_result_path):
+                            resultado_por_bloque[i] = (sub_result_path, piece_geom)
                             result_paths.append(sub_result_path)
                             self.sublotes_completados += 1
                             listos += 1
@@ -1500,6 +1516,25 @@ class LocalDetector:
                     _procesar_eventos_si_hilo_principal()
 
             self.progress_callback = original_callback
+
+            # Control: si dos bloques salieron de la misma carpeta, uno pisó al otro y
+            # sus palmas no son confiables. Se dejan pendientes para "reanudar", que
+            # no vuelve a cobrar las hectáreas ya pagadas del lote.
+            conteo = {}
+            for idx_b, carpeta_b in self._origen_bloques.items():
+                conteo.setdefault(carpeta_b, []).append(idx_b)
+            for carpeta_b, indices_b in conteo.items():
+                if len(indices_b) < 2:
+                    continue
+                logger.error(f"Bloques {indices_b} comparten carpeta de resultado ({carpeta_b}); quedan pendientes para reanudar")
+                for idx_b in indices_b:
+                    if idx_b in resultado_por_bloque:
+                        ruta_b, geom_b = resultado_por_bloque.pop(idx_b)
+                        if ruta_b in result_paths:
+                            result_paths.remove(ruta_b)
+                        pendientes.append(geom_b)
+                        self.sublotes_completados -= 1
+                        self.sublotes_fallidos.append({"sublote": idx_b, "error": "Resultado mezclado con otro bloque; se reprocesa al reanudar"})
 
             # Guardar (o limpiar) el avance para poder reanudar después sin reprocesar
             # ni volver a gastar créditos en los bloques ya resueltos.
@@ -1562,8 +1597,18 @@ class LocalDetector:
         detector_bloque = LocalDetector()
         detector_bloque.lote_grupo_id = getattr(self, "lote_grupo_id", "")
         sub_result_path = detector_bloque.process_detection(image_path, sub_shp_path, "0")
+        with _PREPARACION_LOCK:
+            if not hasattr(self, "job_ids"):
+                self.job_ids = []
+            self.job_ids.extend(getattr(detector_bloque, "job_ids", []))
         if not sub_result_path or not os.path.exists(sub_result_path):
             return None
+        # Se anota de qué carpeta salió cada bloque para verificar al final que
+        # ningún bloque quedó con el resultado de otro (ver control tras el pool).
+        with _PREPARACION_LOCK:
+            if not hasattr(self, "_origen_bloques"):
+                self._origen_bloques = {}
+            self._origen_bloques[indice] = os.path.normcase(os.path.abspath(os.path.dirname(sub_result_path)))
 
         # Copiarlo a nombre propio: cada detector borra su último resultado al
         # arrancar de nuevo, y varios bloques terminan a la vez.
@@ -1964,6 +2009,10 @@ class LocalDetector:
                     if not job_id:
                         raise Exception("No se recibió job_id del servidor")
                     logger.info(f"Job enviado a la cola. Job ID: {job_id}")
+                    # Se guarda para enlazar después los ajustes del cliente ("Validar ajustes").
+                    if not hasattr(self, "job_ids"):
+                        self.job_ids = []
+                    self.job_ids.append(str(job_id))
                     
                     # Construir mensaje informativo con tamaño de archivos (sin estimar un
                     # tiempo en minutos: la relación tamaño/tiempo real varía demasiado
@@ -2195,7 +2244,7 @@ class LocalDetector:
                     # Guardar resultados en carpeta única por lote y momento (junto al TIFF; evita sobrescrituras)
                     image_dir = os.path.dirname(image_path)
                     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-                    folder_name = f"detector_palmas_FID{lot_id_normalized}_{timestamp}"
+                    folder_name = f"detector_palmas_FID{lot_id_normalized}_{timestamp}_{uuid4().hex[:6]}"  # único: varios bloques pueden terminar en el mismo segundo
                     output_dir = os.path.join(image_dir, folder_name)
                     try:
                         os.makedirs(output_dir, exist_ok=True)
@@ -2622,6 +2671,46 @@ def estimar_costo_lote(lotes_path, lot_id, image_path=None):
         return None
 
 
+def _lotes_a_shapefile(lotes_path, lot_id):
+    """Si los lotes no vienen en shapefile (p. ej. GeoPackage), exporta solo el lote
+    elegido a un shapefile temporal, porque el resto del proceso y el servidor
+    trabajan con shapefile. Retorna (ruta_shp, lot_id_en_el_shp)."""
+    if lotes_path.lower().endswith('.shp') and '|' not in lotes_path:
+        return lotes_path, lot_id
+    from qgis.core import QgsVectorFileWriter, QgsFeatureRequest, QgsCoordinateTransformContext
+    capa = QgsVectorLayer(lotes_path, "lotes_origen", "ogr")
+    if not capa.isValid():
+        raise Exception("No se pudo abrir la capa de lotes. Use un shapefile (.shp) o un GeoPackage (.gpkg).")
+    destino_dir = tempfile.mkdtemp(prefix="toolkitpalm_lotes_")
+    nombre = os.path.splitext(os.path.basename(lotes_path.split('|')[0]))[0] or "lotes"
+    destino = os.path.join(destino_dir, nombre + ".shp")
+    opciones = QgsVectorFileWriter.SaveVectorOptions()
+    opciones.driverName = "ESRI Shapefile"
+    opciones.fileEncoding = "UTF-8"
+    nuevo_id = lot_id
+    if lot_id is not None and str(lot_id) != "":
+        try:
+            opciones.onlySelectedFeatures = True
+            capa.selectByIds([int(lot_id)])
+            if capa.selectedFeatureCount() == 0:
+                raise Exception(f"No se encontró el lote {lot_id} en la capa de lotes.")
+            nuevo_id = 0
+        except ValueError:
+            opciones.onlySelectedFeatures = False
+    if hasattr(QgsVectorFileWriter, "writeAsVectorFormatV3"):
+        res = QgsVectorFileWriter.writeAsVectorFormatV3(
+            capa, destino, QgsCoordinateTransformContext(), opciones)
+    else:
+        res = QgsVectorFileWriter.writeAsVectorFormatV2(
+            capa, destino, QgsCoordinateTransformContext(), opciones)
+    if res[0] != QgsVectorFileWriter.NoError or not os.path.exists(destino):
+        raise Exception(f"No se pudo convertir la capa de lotes a shapefile: {res[1] if len(res) > 1 else res}")
+    if not os.path.exists(os.path.splitext(destino)[0] + ".prj"):
+        raise Exception("La capa de lotes no tiene sistema de coordenadas definido.")
+    logging.getLogger(__name__).info(f"Lotes convertidos a shapefile temporal: {destino} (lote {lot_id} -> {nuevo_id})")
+    return destino, nuevo_id
+
+
 def run_detection_headless(image_path, lotes_path, lot_id, progress_callback=None,
                             progress_dialog=None, dockwidget=None, lot_name=None, output_folder=None,
                             reanudar=False):
@@ -2647,10 +2736,9 @@ def run_detection_headless(image_path, lotes_path, lot_id, progress_callback=Non
         )
     del _check_layer
 
-    if not lotes_path or not os.path.exists(lotes_path):
-        raise Exception("No se encontró el shapefile de lotes")
-    if not lotes_path.lower().endswith('.shp'):
-        raise Exception("El archivo de lotes debe ser un shapefile (.shp)")
+    if not lotes_path or not os.path.exists(lotes_path.split('|')[0]):
+        raise Exception("No se encontró el archivo de lotes")
+    lotes_path, lot_id = _lotes_a_shapefile(lotes_path, lot_id)
 
     base_path = os.path.splitext(lotes_path)[0]
     missing_files = []
@@ -2699,6 +2787,14 @@ def run_detection_headless(image_path, lotes_path, lot_id, progress_callback=Non
     if not vlayer.crs().isValid():
         raise Exception("La capa no tiene un sistema de coordenadas válido")
 
+    # Identificadores de la detección, para enviarlos con "Validar ajustes".
+    try:
+        vlayer.setCustomProperty("toolkitpalm/deteccion_id", ",".join(getattr(detector, "job_ids", []) or []))
+        vlayer.setCustomProperty("toolkitpalm/lote_grupo_id", getattr(detector, "lote_grupo_id", "") or "")
+        from .dockwidget import DetectorPalmasDockWidget as _DW
+        vlayer.setCustomProperty("toolkitpalm/firma_original", _DW._firma_capa_palmas(vlayer))
+    except Exception:
+        logger.debug("No se pudieron guardar los identificadores de la detección", exc_info=True)
     QgsProject.instance().addMapLayer(vlayer)
 
     try:

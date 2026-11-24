@@ -226,7 +226,7 @@ _TOOLS = [(k, e) for k, e in _TOOLS if _herramienta_incluida(k)]
 # Herramientas visibles pero deshabilitadas: se ven en gris y nadie las abre.
 _DISABLED_TOOLS = {"segmentador", "diseno_plantacion", "mapa_calor", "disenador_riego", "optimizador", "fotogrametria"}
 
-# De las deshabilitadas, las que el administrador (correo en ADMIN_EMAILS, con
+# De las deshabilitadas, las que el administrador (según el servidor: es_admin en /apis/creditos/yo, con
 # sesión iniciada) sí puede abrir para seguir desarrollándolas. Para él también
 # se ven en gris, para que no se confundan con las publicadas.
 _TOOLS_SOLO_ADMIN = {"segmentador", "diseno_plantacion", "mapa_calor", "disenador_riego", "optimizador", "fotogrametria"}
@@ -541,55 +541,61 @@ class ToolkitPalmDockWidget(QDockWidget):
         return es_administrador()
 
     def _on_regalar_creditos(self):
-        """Regala créditos a un cliente, buscándolo por su correo de Google."""
-        from .config import CREDITS_REGALAR_ENDPOINT, ADMIN_API_KEY
+        """Regala créditos a otra cuenta. El servidor decide de dónde salen:
+        los clientes regalan de su saldo; la cuenta del dueño, sin límite."""
+        from .config import CREDITS_REGALAR_ENDPOINT
+        from .common.permisos import perfil_servidor
+
+        perfil = perfil_servidor(forzar=True)
+        if not perfil:
+            QMessageBox.warning(self, "Regalar créditos",
+                                "Inicia sesión con Google para regalar créditos.")
+            return
+        admin = bool(perfil.get("es_admin"))
+        saldo = perfil.get("creditos_saldo")
+        disponible = "sin límite (cuenta del dueño)" if admin else f"{saldo} créditos"
 
         correo, ok = QInputDialog.getText(
             self, "Regalar créditos",
-            "Correo de Google del cliente:\n(debe haber iniciado sesión al menos una vez)")
+            f"Saldo disponible para regalar: {disponible}\n\n"
+            "Correo de Google de la persona:\n(debe haber iniciado sesión al menos una vez)")
         if not ok or not correo.strip():
             return
-
+        maximo = 100000 if admin else max(int(saldo or 0), 1)
         cantidad, ok = QInputDialog.getInt(
             self, "Regalar créditos",
             f"¿Cuántos créditos le regalas a {correo.strip()}?\n"
-            "(1 crédito = hasta 5 ha; un paquete son 60)",
-            60, 1, 10000)
+            f"Disponible: {disponible}  (1 crédito = hasta 5 ha)",
+            min(60, maximo), 1, maximo)
         if not ok:
             return
+        origen = "" if admin else "\nSe descontarán de tu saldo."
+        if QMessageBox.question(
+                self, "Confirmar regalo",
+                f"¿Regalar {cantidad} créditos a {correo.strip()}?{origen}") != QMessageBox.StandardButton.Yes:
+            return
 
-        try:
-            import requests
-            respuesta = requests.post(
-                CREDITS_REGALAR_ENDPOINT,
-                headers={"X-Admin-Key": ADMIN_API_KEY},
-                data={"client_id": "", "email": correo.strip(), "cantidad": cantidad,
-                      "nota": "regalo del dueño"},
-                timeout=30,
-            )
-            if respuesta.status_code == 200:
-                datos = respuesta.json()
-                QMessageBox.information(
-                    self, "Créditos regalados",
-                    f"Se le regalaron {cantidad} créditos a {correo.strip()}.\n"
-                    f"Su saldo quedó en {datos.get('creditos_saldo', '—')} créditos.")
-            else:
-                detalle = respuesta.text
-                try:
-                    detalle = respuesta.json().get("detail", detalle)
-                except Exception:
-                    logging.getLogger(__name__).debug(
-                        "Fallo no crítico; se continúa.", exc_info=True)
-                QMessageBox.warning(self, "No se pudo regalar", str(detalle))
-        except Exception as e:
-            QMessageBox.warning(self, "No se pudo regalar", f"Error de conexión: {e}")
+        ok, datos = self._peticion_creditos(
+            CREDITS_REGALAR_ENDPOINT, {"email": correo.strip(), "cantidad": cantidad})
+        if not ok:
+            QMessageBox.warning(self, "No se pudo regalar", str(datos))
+            return
+        if datos.get("del_dueno") or datos.get("creditos_saldo") is None:
+            resto = ""
+        else:
+            resto = f"\nTu saldo quedó en {datos.get('creditos_saldo')} créditos."
+        QMessageBox.information(
+            self, "Créditos regalados",
+            f"Le regalaste {datos.get('creditos_regalados', cantidad)} créditos a "
+            f"{datos.get('email', correo.strip())}.{resto}")
+        self._refresh_credits_label()
 
-    def _peticion_creditos(self, url, datos, con_admin=False, timeout=30):
+    def _peticion_creditos(self, url, datos, timeout=30):
         """Llama al backend de créditos y devuelve (ok, datos_o_mensaje)."""
         import requests
-        from .config import API_KEY, ADMIN_API_KEY
-        cabeceras = {"X-Admin-Key": ADMIN_API_KEY} if con_admin else {"X-API-Key": API_KEY}
-        if not con_admin:
+        from .config import API_KEY
+        cabeceras = {"X-API-Key": API_KEY}
+        if True:
             try:
                 from . import google_auth
                 token = google_auth.obtener_id_token()
@@ -619,13 +625,32 @@ class ToolkitPalmDockWidget(QDockWidget):
         puede alterar desde el plugin.
         """
         from .config import PAGOS_CHECKOUT_ENDPOINT, CREDITS_PURCHASE_URL
+        import requests
+        base = PAGOS_CHECKOUT_ENDPOINT.rsplit("/", 1)[0]
+
+        # Paquetes y precios los define el servidor; el plugin solo los muestra.
+        eleccion = {}
+        try:
+            r = requests.get(f"{base}/paquetes", timeout=20)
+            catalogo = r.json() if r.status_code == 200 else None
+        except Exception:
+            catalogo = None
+        if catalogo and catalogo.get("paquetes"):
+            from .common.compra import CompraCreditosDialog
+            dlg = CompraCreditosDialog(
+                self, catalogo,
+                lambda _m, ruta, datos: self._peticion_creditos(f"{base}/{ruta}", datos))
+            if dlg.exec() != QDialog.DialogCode.Accepted or not dlg.eleccion:
+                return
+            eleccion = dlg.eleccion
 
         ok, datos = self._peticion_creditos(
             PAGOS_CHECKOUT_ENDPOINT,
-            {"client_id": client_identity.get_client_id(), "codigo_descuento": ""},
+            dict({"client_id": client_identity.get_client_id(), "codigo_descuento": ""}, **eleccion),
         )
         if not ok:
             # Sin pagos configurados todavía: se abre la página informativa.
+            logging.getLogger(__name__).warning(f"Checkout de pagos no disponible: {datos}")
             QDesktopServices.openUrl(QUrl(CREDITS_PURCHASE_URL))
             return
 
@@ -757,7 +782,6 @@ class ToolkitPalmDockWidget(QDockWidget):
             CREDITS_CODIGO_CREAR_ENDPOINT,
             {"codigo": personalizado.strip(), "tipo": tipo, "valor": valor,
              "usos_maximos": usos, "dias_validez": dias, "nota": "creado desde el plugin"},
-            con_admin=True,
         )
         if not ok:
             QMessageBox.warning(self, "No se pudo crear", str(datos))
@@ -943,12 +967,11 @@ class ToolkitPalmDockWidget(QDockWidget):
         canjear_button.clicked.connect(self._on_canjear_codigo)
         layout.addWidget(canjear_button)
 
-        if self._es_administrador():
-            regalar_button = QPushButton("Regalar créditos a un cliente")
-            regalar_button.setStyleSheet("font-weight: bold;")
-            regalar_button.clicked.connect(self._on_regalar_creditos)
-            layout.addWidget(regalar_button)
+        regalar_button = QPushButton("Regalar créditos")
+        regalar_button.clicked.connect(self._on_regalar_creditos)
+        layout.addWidget(regalar_button)
 
+        if self._es_administrador():
             crear_codigo_button = QPushButton("Crear código de regalo o descuento")
             crear_codigo_button.setStyleSheet("font-weight: bold;")
             crear_codigo_button.clicked.connect(self._on_crear_codigo)
@@ -1125,7 +1148,32 @@ class ToolkitPalmDockWidget(QDockWidget):
             "background: #eef2f6; padding: 7px 4px; "
             "border-top: 1px solid #d9dcdf; border-bottom: 1px solid #d9dcdf;"
         )
-        sidebar_layout.addWidget(autoria)
+        # Al ladito de la firma: ícono (!) que abre los términos y condiciones.
+        pie = QWidget()
+        pie_layout = QHBoxLayout(pie)
+        pie_layout.setContentsMargins(0, 0, 0, 0)
+        pie_layout.setSpacing(0)
+        pie_layout.addWidget(autoria, 1)
+        icono_terminos = QPushButton("!")
+        icono_terminos.setToolTip("Términos y condiciones")
+        icono_terminos.setCursor(Qt.CursorShape.PointingHandCursor)
+        icono_terminos.setFixedSize(20, 20)
+        icono_terminos.setStyleSheet(
+            f"QPushButton {{ color: {AZUL_OSCURO}; font-weight: bold; font-size: 12px; "
+            f"border: 2px solid {AZUL_OSCURO}; border-radius: 10px; background: white; padding: 0px; }}"
+            "QPushButton:hover { background: #dbe6f3; }")
+
+        def _abrir_terminos():
+            from .common.terminos import mostrar_terminos
+            mostrar_terminos(self)
+        icono_terminos.clicked.connect(_abrir_terminos)
+        contenedor_icono = QWidget()
+        contenedor_icono.setStyleSheet("background: #eef2f6; border-top: 1px solid #d9dcdf; border-bottom: 1px solid #d9dcdf;")
+        ci = QHBoxLayout(contenedor_icono)
+        ci.setContentsMargins(2, 0, 6, 0)
+        ci.addWidget(icono_terminos)
+        pie_layout.addWidget(contenedor_icono)
+        sidebar_layout.addWidget(pie)
 
         self._aplicar_permisos_herramientas()
         return sidebar
@@ -1585,7 +1633,15 @@ class ToolkitPalmDockWidget(QDockWidget):
 
     def _on_toggle_mcp_server(self, checked):
         if checked:
-            from .assistant.qgis_actions import QgisMCPServer
+            try:
+                from .assistant.qgis_actions import QgisMCPServer
+            except ImportError:
+                # Esta instalación no trae el módulo del asistente: se apaga la
+                # opción en vez de mostrar un error de Python cada vez que se abre.
+                self._mcp_toggle_button.setChecked(False)
+                self._mcp_status_label.setText("Conexión externa no disponible en esta versión del plugin.")
+                self._recordar_estado_conexion(False)
+                return
             if self._mcp_server is None:
                 self._mcp_server = QgisMCPServer(
                     port=self._mcp_port_spin.value(),

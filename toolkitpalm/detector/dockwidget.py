@@ -477,7 +477,7 @@ class LegalNoticeDialog(QDialog):
             <li style='margin-bottom: 3px;'>Haga clic en <strong>"Detectar"</strong> para iniciar la detección.</li>
             <li style='margin-bottom: 3px;'>Espere a que el proceso finalice. Los resultados se cargarán automáticamente como una capa de puntos en QGIS. El shapefile se guardará en una subcarpeta dentro del directorio de la ortoimagen, identificada por el FID del lote y la fecha/hora de detección (p.ej.: <em>detector_palmas_FID32_20260611094302</em>).</li>
             <li style='margin-bottom: 3px;'><em>(Opcional)</em> Use <strong>"Editar Palmas"</strong> para agregar, eliminar o mover detecciones manualmente sobre el mapa.</li>
-            <li style='margin-bottom: 3px;'><em>(Opcional)</em> Use <strong>"Activar Numeración de Palmas"</strong> para generar numeración secuencial de palmas por línea de siembra.</li>
+            <li style='margin-bottom: 3px;'><em>(Opcional)</em> Use <strong>"1. Confirmar palmas" y luego "2. Numerar"</strong> para generar numeración secuencial de palmas por línea de siembra.</li>
         </ol>
 
         <h3 style='color: #2c3e50; font-size: 13px; margin-bottom: 6px; margin-top: 12px;'>Notas importantes:</h3>
@@ -1030,6 +1030,17 @@ class DropLineEdit(QLineEdit):
                     }
                 """)
         elif self.file_type == 'lotes':
+            if file_path.lower().endswith('.gpkg'):
+                self.setText(file_path)
+                self.setStyleSheet("""
+                    QLineEdit {
+                        background-color: white;
+                        border: 2px solid #00A9E0;
+                        border-radius: 4px;
+                        padding: 5px;
+                    }
+                """)
+                return
             if file_path.lower().endswith('.shp'):
                 # Verificar que existan los archivos relacionados
                 base_path = os.path.splitext(file_path)[0]
@@ -1357,7 +1368,7 @@ class InstructivoDialog(QtWidgets.QDialog):
             "titulo": "6. Numerar las palmas",
             "imagen": "paso6_numerar",
             "texto": """
-            <p>Solo después de limpiar, presione <b>"Activar Numeración de Palmas"</b>.
+            <p>Solo después de limpiar, presione <b>"1. Confirmar palmas" y luego "2. Numerar"</b>.
             La herramienta solicita cuatro palmas, en este orden:</p>
             <ol>
               <li>Primera palma de la <b>línea 1</b></li>
@@ -1921,6 +1932,7 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         logger.info(f"Botón activatePalmNumberingButton existe: {hasattr(self, 'activatePalmNumberingButton')}")
         if hasattr(self, 'activatePalmNumberingButton'):
             self.activatePalmNumberingButton.clicked.connect(self.on_activate_palm_numbering_clicked)
+            self._instalar_bloqueo_numeracion()
             logger.info("Botón de numeración de palmas conectado correctamente")
             # Verificar condiciones iniciales y habilitar el botón si corresponde
             self.check_and_enable_numbering_button()
@@ -1932,6 +1944,7 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             self.editPalmsButton.clicked.connect(self.show_edit_palms_toolbar)
             logger.info("Botón de edición de palmas conectado correctamente")
             self._create_deviation_button()
+            self._create_validate_button()
             self._create_palm_layer_selector()
 
         # Agregar tooltips a los botones
@@ -1984,7 +1997,9 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # Mostrar el aviso legal una sola vez por instalación, no en cada apertura
         # de QGIS: se recuerda la aceptación en la configuración del usuario.
         settings = QSettings()
-        already_accepted = settings.value("ToolkitPalm/Detector/terms_accepted", False, type=bool)
+        # Los términos ya se aceptan al abrir ToolkitPalm (common/terminos.py).
+        from ..common.terminos import terminos_aceptados
+        already_accepted = terminos_aceptados() or settings.value("ToolkitPalm/Detector/terms_accepted", False, type=bool)
 
         if already_accepted:
             self.terms_accepted = True
@@ -2562,7 +2577,7 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                         # Validar si hay archivos seleccionados
                         files_selected = (hasattr(self, 'lineEdit') and self.lineEdit.text().strip() and 
                                         hasattr(self, 'lineEdit_2') and self.lineEdit_2.text().strip())
-                        ok_button.setEnabled(files_selected)
+                        ok_button.setEnabled(bool(files_selected))
                     else:
                         ok_button.setEnabled(False)
             
@@ -3241,13 +3256,13 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                     self,
                     "Seleccionar capa de lotes",
                     "",
-                    "Shapefiles (*.shp);;Todos los archivos (*)"
+                    "Capas de lotes (*.shp *.gpkg);;Shapefiles (*.shp);;GeoPackage (*.gpkg);;Todos los archivos (*)"
                 )
 
             if file_path and os.path.exists(file_path):
-                # Verificar que existan los archivos relacionados
+                # Verificar que existan los archivos relacionados (solo shapefile)
                 base_path = os.path.splitext(file_path)[0]
-                required_files = ['.shp', '.dbf', '.shx', '.prj']
+                required_files = ['.shp', '.dbf', '.shx', '.prj'] if file_path.lower().endswith('.shp') else []
                 missing_files = []
                 
                 for ext in required_files:
@@ -4829,6 +4844,18 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                 )
                 return
             
+            # Obligatorio: los ajustes del cliente se validan antes de numerar.
+            if not self._capa_validada(palm_layer):
+                r = QtWidgets.QMessageBox.question(
+                    self, "Primero confirme las palmas",
+                    "Antes de numerar debe confirmar las palmas de la capa "
+                    "(botón «1. Confirmar palmas»).\n\n¿Confirmar ahora?")
+                if r != QtWidgets.QMessageBox.StandardButton.Yes:
+                    return
+                self.on_validar_ajustes_clicked()
+                if not self._capa_validada(palm_layer):
+                    return
+
             # IMPORTANTE: Obtener el lote actualmente seleccionado
             # Primero intentar usar self.lot_id si está disponible y es válido
             lot_id = None
@@ -6363,6 +6390,211 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                     logging.getLogger(__name__).debug("Sin barra de mensajes", exc_info=True)
         return capa
 
+    # ------------------------------------------------------------------
+    # Validar ajustes: obligatorio antes de numerar
+    # ------------------------------------------------------------------
+    _PROP_VALIDADO = "toolkitpalm/ajustes_validados"
+
+    def _create_validate_button(self):
+        """Boton 'Validar ajustes', justo debajo de 'Editar Palmas'."""
+        boton = QtWidgets.QPushButton("1. Confirmar palmas")
+        boton.setCursor(Qt.CursorShape.PointingHandCursor)
+        boton.setToolTip(
+            "Envía la capa de palmas con sus correcciones (palmas agregadas, borradas "
+            "o movidas). Es obligatorio antes de numerar; si vuelve a editar, debe "
+            "confirmar otra vez.")
+        boton.setStyleSheet("""
+            QPushButton { background-color: #15803d; color: white; border: none; padding: 8px;
+                          border-radius: 4px; font-weight: bold; font-size: 12px; }
+            QPushButton:hover { background-color: #166534; }
+            QPushButton:disabled { background-color: #d1d5db; color: #9ca3af; }
+        """)
+        boton.clicked.connect(self.on_validar_ajustes_clicked)
+        boton.setVisible(self.editPalmsButton.isVisible())
+        layout = getattr(self, 'gridLayout', None)
+        if layout is None or layout.indexOf(self.editPalmsButton) < 0:
+            logger.warning("No se encontró el layout de editPalmsButton; no se agregó 'Validar ajustes'")
+            return
+        fila, columna, _alto, ancho = layout.getItemPosition(layout.indexOf(self.editPalmsButton))
+        self._insertar_fila_en_grilla(layout, fila + 1, boton, columna, ancho)
+        self.validateAdjustmentsButton = boton
+
+    _PROP_OK = "toolkitpalm/ajustes_validados_ok"
+
+    def _instalar_bloqueo_numeracion(self):
+        """El botón Numerar queda gris y sin acción hasta validar los ajustes.
+
+        El resto del panel sigue llamando setEnabled() como siempre; aquí se
+        intercepta para que, además, exija que la capa de palmas esté validada."""
+        boton = self.activatePalmNumberingButton
+        if getattr(boton, "_bloqueo_instalado", False):
+            return
+        original = boton.setEnabled
+        boton._habilitado_deseado = boton.isEnabled()
+
+        def set_enabled(valor):
+            boton._habilitado_deseado = bool(valor)
+            listo = bool(valor) and self._lista_para_numerar()
+            original(listo)
+            boton.setToolTip("" if listo or not valor else
+                             "Primero confirme las palmas (botón «1. Confirmar palmas»).")
+
+        boton.setEnabled = set_enabled
+        boton._set_enabled_original = original
+        boton._bloqueo_instalado = True
+        boton.setStyleSheet((boton.styleSheet() or "") +
+            " QPushButton:disabled { background-color: #d1d5db; color: #9ca3af; border: none; }")
+        self._capas_vigiladas = set()
+        self._timer_numeracion = QTimer(self)
+        self._timer_numeracion.timeout.connect(self._refrescar_bloqueo_numeracion)
+        self._timer_numeracion.start(1500)
+        self._refrescar_bloqueo_numeracion()
+
+    def _lista_para_numerar(self):
+        try:
+            capa = self.get_latest_palm_layer()
+        except Exception:
+            return False
+        if not capa:
+            return False
+        self._vigilar_capa(capa)
+        return capa.customProperty(self._PROP_OK, "") == "1" and not capa.isEditable()
+
+    def _vigilar_capa(self, capa):
+        """Si la capa se vuelve a editar, deja de estar validada."""
+        if capa.id() in self._capas_vigiladas:
+            return
+        self._capas_vigiladas.add(capa.id())
+
+        def invalidar(*_a, c=capa):
+            try:
+                c.setCustomProperty(self._PROP_OK, "")
+            except RuntimeError:
+                return
+            self._refrescar_bloqueo_numeracion()
+        capa.editingStarted.connect(invalidar)
+        capa.layerModified.connect(invalidar)
+
+    def _refrescar_bloqueo_numeracion(self):
+        boton = getattr(self, "activatePalmNumberingButton", None)
+        if boton is None or not getattr(boton, "_bloqueo_instalado", False):
+            return
+        try:
+            boton.setEnabled(boton._habilitado_deseado)
+        except RuntimeError:
+            pass
+
+    @staticmethod
+    def _firma_capa_palmas(capa):
+        """Huella del contenido: cambia si se agrega, borra o mueve una palma."""
+        import hashlib
+        partes = []
+        for f in capa.getFeatures():
+            g = f.geometry()
+            if g is None or g.isEmpty():
+                continue
+            p = g.centroid().asPoint()
+            partes.append(f"{p.x():.3f},{p.y():.3f}")
+        partes.sort()
+        return hashlib.sha1("|".join(partes).encode("utf-8")).hexdigest()
+
+    def _capa_validada(self, capa):
+        return bool(capa) and capa.customProperty(self._PROP_VALIDADO, "") == self._firma_capa_palmas(capa)
+
+    def on_validar_ajustes_clicked(self):
+        capa = self.get_latest_palm_layer()
+        if not capa:
+            QtWidgets.QMessageBox.warning(self, "Confirmar palmas",
+                "No se encontró la capa de palmas. Realice primero la detección.")
+            return
+        if capa.isEditable():
+            r = QtWidgets.QMessageBox.question(self, "Confirmar palmas",
+                "La capa de palmas todavía está en edición.\n\n¿Guardar los cambios y confirmar?")
+            if r != QtWidgets.QMessageBox.StandardButton.Yes:
+                return
+            if not capa.commitChanges():
+                QtWidgets.QMessageBox.warning(self, "Confirmar palmas",
+                    "No se pudieron guardar los cambios de la capa: " + "; ".join(capa.commitErrors()))
+                return
+        if self._capa_validada(capa):
+            capa.setCustomProperty(self._PROP_OK, "1")
+            self._refrescar_bloqueo_numeracion()
+            QtWidgets.QMessageBox.information(self, "Confirmar palmas",
+                "Estas palmas ya estaban confirmadas. Ya puede numerar.")
+            return
+        original = capa.customProperty("toolkitpalm/firma_original", "")
+        if original and original == self._firma_capa_palmas(capa):
+            r = QtWidgets.QMessageBox.question(self, "Confirmar palmas",
+                "No hiciste ningún cambio a la detección.\n\n"
+                "Confirma solo si revisaste el lote y la detección está correcta tal como está.\n\n"
+                "¿Confirmas que la detección está correcta?")
+            if r != QtWidgets.QMessageBox.StandardButton.Yes:
+                return
+        if self._enviar_ajustes(capa):
+            capa.setCustomProperty(self._PROP_VALIDADO, self._firma_capa_palmas(capa))
+            capa.setCustomProperty(self._PROP_OK, "1")
+            self._refrescar_bloqueo_numeracion()
+            QtWidgets.QMessageBox.information(self, "Confirmar palmas",
+                "Palmas confirmadas. Ya puede numerar.")
+
+    def _enviar_ajustes(self, capa):
+        """Sube la capa corregida al servidor. True si el servidor la recibió."""
+        import requests, tempfile, zipfile, shutil
+        from qgis.core import QgsVectorFileWriter
+        from ..config import CORRECCIONES_VALIDAR_ENDPOINT
+        from ..client_identity import cabeceras_autenticacion, get_client_id
+        from ..common.terminos import TERMINOS_VERSION, version_plugin
+        carpeta = tempfile.mkdtemp(prefix="toolkitpalm_ajustes_")
+        try:
+            ruta = os.path.join(carpeta, "palmas_ajustadas.shp")
+            op = QgsVectorFileWriter.SaveVectorOptions()
+            op.driverName = "ESRI Shapefile"
+            op.fileEncoding = "UTF-8"
+            res = QgsVectorFileWriter.writeAsVectorFormatV3(
+                capa, ruta, QgsProject.instance().transformContext(), op)
+            if res[0] != QgsVectorFileWriter.NoError:
+                raise Exception(res[1])
+            zip_path = os.path.join(carpeta, "ajustes.zip")
+            # client_id lo saca el servidor del token; se manda igual por compatibilidad.
+            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+                for ext in (".shp", ".shx", ".dbf", ".prj", ".cpg"):
+                    a = os.path.splitext(ruta)[0] + ext
+                    if os.path.exists(a):
+                        z.write(a, os.path.basename(a))
+            datos = {
+                "client_id": get_client_id(),
+                "capa": capa.name(),
+                "total_palmas": str(capa.featureCount()),
+                "deteccion_id": str(capa.customProperty("toolkitpalm/deteccion_id", "") or ""),
+                "lote_grupo_id": str(capa.customProperty("toolkitpalm/lote_grupo_id", "") or ""),
+                "version_plugin": version_plugin(),
+                "version_terminos": TERMINOS_VERSION,
+            }
+            if os.path.getsize(zip_path) > 10 * 1024 * 1024:
+                raise Exception("La capa de palmas es demasiado grande para confirmarla (máximo 10 MB).")
+            with open(zip_path, "rb") as fz:
+                r = requests.post(CORRECCIONES_VALIDAR_ENDPOINT, headers=cabeceras_autenticacion(),
+                                  data=datos, files={"archivo": ("ajustes.zip", fz, "application/zip")},
+                                  timeout=120)
+            if r.status_code == 200:
+                return True
+            if r.status_code == 404:
+                detalle = "El servidor todavía no tiene activada la confirmación de palmas."
+            else:
+                try:
+                    detalle = r.json().get("detail", r.text)
+                except Exception:
+                    detalle = r.text
+            QtWidgets.QMessageBox.warning(self, "No se pudieron confirmar las palmas", str(detalle)[:500])
+            return False
+        except Exception as e:
+            logger.error(f"Error al validar ajustes: {e}")
+            QtWidgets.QMessageBox.warning(self, "No se pudieron confirmar las palmas",
+                f"Error de conexión o al preparar la capa: {e}")
+            return False
+        finally:
+            shutil.rmtree(carpeta, ignore_errors=True)
+
     def _sync_deviation_button(self, visible):
         """El resaltado acompaña a 'Editar Palmas': tiene sentido sobre la misma
         capa y en el mismo momento del flujo."""
@@ -6370,6 +6602,10 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         if boton is not None:
             boton.setVisible(visible)
             boton.setEnabled(visible)
+        boton_validar = getattr(self, 'validateAdjustmentsButton', None)
+        if boton_validar is not None:
+            boton_validar.setVisible(visible)
+            boton_validar.setEnabled(visible)
 
         # El selector de capa acompaña a estos botones: si no hay nada que editar,
         # tampoco hay capa que elegir.
