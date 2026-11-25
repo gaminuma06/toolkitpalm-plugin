@@ -3707,14 +3707,14 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                     return
                 elif overlap_percentage < 50.0:  # Si el traslape es menor al 50%
                     logger.warning(f"El traslape es pequeño ({overlap_percentage:.2f}%)")
-                    if QtWidgets.QMessageBox.No == QtWidgets.QMessageBox.question(
+                    if QtWidgets.QMessageBox.StandardButton.No == QtWidgets.QMessageBox.question(
                         self,
                         "Traslape Reducido",
                         f"El traslape entre el lote y la imagen es pequeño ({overlap_percentage:.2f}%).\n\n"
                         "Esto podría afectar la calidad de la detección.\n\n"
                         "¿Desea continuar con la detección?",
-                        QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
-                        QtWidgets.QMessageBox.No
+                        QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+                        QtWidgets.QMessageBox.StandardButton.No
                     ):
                         return
                 
@@ -3732,7 +3732,7 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                 
                 # Mostrar diálogo de confirmación con la estimación del tamaño del clip
                 confirm_dialog = ConfirmDialog(self, lot_info, image_path, estimated_clip_size_mb)
-                if confirm_dialog.exec() == QtWidgets.QDialog.Accepted:
+                if confirm_dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
                     logger.info("Usuario confirmó la detección")
                     
                     try:
@@ -6496,7 +6496,7 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             p = g.centroid().asPoint()
             partes.append(f"{p.x():.3f},{p.y():.3f}")
         partes.sort()
-        return hashlib.sha1("|".join(partes).encode("utf-8")).hexdigest()
+        return hashlib.sha256("|".join(partes).encode("utf-8")).hexdigest()
 
     def _capa_validada(self, capa):
         return bool(capa) and capa.customProperty(self._PROP_VALIDADO, "") == self._firma_capa_palmas(capa)
@@ -6680,7 +6680,7 @@ class DetectorPalmasDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         combo = QtWidgets.QComboBox()
         combo.setToolTip("Capa sobre la que se aplicarán: resaltar desviaciones, "
                          "editar palmas y numeración.")
-        combo.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        combo.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
         combo.setStyleSheet("QComboBox { font-size: 11px; padding: 3px; }")
         fila.addWidget(combo, 1)
 

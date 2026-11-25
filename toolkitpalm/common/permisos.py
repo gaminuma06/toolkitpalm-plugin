@@ -6,7 +6,7 @@ la sesión de Google del usuario, y se guarda la respuesta unos minutos.
 """
 import time
 
-_CACHE = {"t": 0.0, "datos": None, "token": None}
+_CACHE = {"t": 0.0, "datos": None, "sesion": ""}
 _DURACION = 300  # segundos
 
 
@@ -19,7 +19,7 @@ def perfil_servidor(forzar=False):
         token = None
     if not token:
         return None
-    if (not forzar and _CACHE["datos"] is not None and _CACHE["token"] == token
+    if (not forzar and _CACHE["datos"] is not None and _CACHE["sesion"] == token
             and time.time() - _CACHE["t"] < _DURACION):
         return _CACHE["datos"]
     try:
@@ -31,7 +31,7 @@ def perfil_servidor(forzar=False):
         datos = r.json() if r.status_code == 200 else None
     except Exception:
         datos = None
-    _CACHE.update(t=time.time(), datos=datos, token=token)
+    _CACHE.update(t=time.time(), datos=datos, sesion=token)
     return datos
 
 

@@ -995,9 +995,9 @@ class ToolkitPalmDockWidget(QDockWidget):
             "¿Recargar el plugin ahora?\n\nEsto vuelve a cargar el código desde disco "
             "(por ejemplo, después de una actualización). El panel se cerrará y volverá "
             "a abrirse; las capas de tu proyecto no se ven afectadas.",
-            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
         )
-        if reply != QtWidgets.QMessageBox.Yes:
+        if reply != QtWidgets.QMessageBox.StandardButton.Yes:
             return
         # Se difiere un instante para que este método termine de manejar la
         # señal del botón antes de que el propio widget (dueño del botón) se
