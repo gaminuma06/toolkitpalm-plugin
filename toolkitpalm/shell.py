@@ -713,6 +713,40 @@ class ToolkitPalmDockWidget(QDockWidget):
             logging.getLogger(__name__).debug(
                 "Fallo no crítico; se continúa.", exc_info=True)
 
+    def _on_registrar_whatsapp(self, dialogo=None, boton=None):
+        """Registra el WhatsApp del usuario; el servidor regala los créditos una sola vez."""
+        import re
+        from .config import CREDITS_BASE_URL
+        from .common.permisos import perfil_servidor
+
+        numero, ok = QInputDialog.getText(
+            self, "Registra tu WhatsApp",
+            "Escribe tu número de WhatsApp con el indicativo del país.\n"
+            "Ejemplo: 57 300 123 4567\n\n"
+            "Lo usamos para avisos del servicio y soporte. Al registrarlo recibes créditos gratis.")
+        if not ok:
+            return
+        digitos = re.sub(r"\D", "", numero or "")
+        if len(digitos) == 10 and digitos.startswith("3"):
+            digitos = "57" + digitos
+        if not 10 <= len(digitos) <= 15:
+            QMessageBox.warning(self, "Número no válido",
+                                "Revisa el número: debe tener el indicativo del país y entre 10 y 15 dígitos.")
+            return
+
+        ok, datos = self._peticion_creditos(f"{CREDITS_BASE_URL}/whatsapp", {"numero": digitos})
+        if not ok:
+            QMessageBox.warning(self, "No se pudo registrar", str(datos))
+            return
+        perfil_servidor(forzar=True)
+        if boton is not None:
+            boton.setVisible(False)
+        self._refresh_credits_label()
+        QMessageBox.information(
+            self, "¡Listo!",
+            f"Registramos tu WhatsApp y te regalamos {datos.get('creditos_regalados', 30)} créditos.\n"
+            f"Tu saldo quedó en {datos.get('creditos_saldo', '—')} créditos.")
+
     def _on_canjear_codigo(self):
         """Canjea un código de créditos o descuento (disponible para cualquier usuario)."""
         from .config import CREDITS_CODIGO_CANJEAR_ENDPOINT
@@ -966,6 +1000,19 @@ class ToolkitPalmDockWidget(QDockWidget):
         canjear_button = QPushButton("Canjear un código")
         canjear_button.clicked.connect(self._on_canjear_codigo)
         layout.addWidget(canjear_button)
+
+        # Incentivo: registrar el WhatsApp una sola vez (lo controla el servidor).
+        from .common.permisos import perfil_servidor
+        _perfil = perfil_servidor() or {}
+        # Solo si el servidor ya maneja el registro (trae el campo) y aún no lo hizo.
+        if _perfil.get("whatsapp_registrado") is False:
+            whatsapp_button = QPushButton("Registra tu WhatsApp y recibe 30 créditos gratis")
+            whatsapp_button.setStyleSheet(
+                "QPushButton { background-color: #16a34a; color: white; font-weight: bold; "
+                "border: none; border-radius: 4px; padding: 8px; } "
+                "QPushButton:hover { background-color: #15803d; }")
+            whatsapp_button.clicked.connect(lambda: self._on_registrar_whatsapp(dialog, whatsapp_button))
+            layout.addWidget(whatsapp_button)
 
         regalar_button = QPushButton("Regalar créditos")
         regalar_button.clicked.connect(self._on_regalar_creditos)

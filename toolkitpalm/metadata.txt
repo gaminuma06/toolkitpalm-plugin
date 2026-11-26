@@ -5,7 +5,7 @@
 name=ToolkitPalm
 qgisMinimumVersion=3.16
 description=Detect, count and number oil palm trees, and trim the empty borders of drone orthomosaics.
-version=1.2.1
+version=1.2.2
 author=Ing. Adán Arias
 email=ingarias9006@gmail.com
 
@@ -30,7 +30,8 @@ homepage=https://github.com/gaminuma06/toolkitpalm-plugin
 # Recommended items:
 hasProcessingProvider=no
 
-changelog=1.2.1 - Security scan fixes (no functional changes): stronger hash for the palm-layer fingerprint, cache field renamed, scoped Qt enums for Qt6.
+changelog=1.2.2 - New: register your WhatsApp from the credits window and get free credits (once per account, granted by the server).
+    1.2.1 - Security scan fixes (no functional changes): stronger hash for the palm-layer fingerprint, cache field renamed, scoped Qt enums for Qt6.
     1.2.0 - Terms and conditions must be accepted to use the plugin (shown on install and on every update); (!) icon next to the author name to read them.
     - New "1. Confirm palms" step: corrections are sent to the server and "2. Number" stays disabled until the palms are confirmed.
     - Buy credits: choose a package or any amount, with the price shown before paying.
